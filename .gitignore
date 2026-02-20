@@ -1,0 +1,9 @@
+.DS_Store
+cmake-build*/
+build/
+*.rpy
+.clangd
+.clang-tidy
+.idea/
+*.rpy
+*.rpyc
