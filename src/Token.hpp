@@ -32,6 +32,9 @@ enum class OpType : std::uint8_t {
     And,
     Or,
     Neg,
+    Comma,
+    LParen,
+    RParen,
 };
 
 struct Tok {
@@ -285,6 +288,12 @@ inline auto op_str(const OpType &type) -> std::string {
             return "or";
         case OpType::Neg:
             return "-";
+        case OpType::Comma:
+            return ",";
+        case OpType::LParen:
+            return "(";
+        case OpType::RParen:
+            return ")";
         default:
             std::println(std::cerr, "Invalid operator in token");
             std::unreachable();
@@ -452,7 +461,7 @@ struct std::formatter<Token> {
     bool w_colors = false;
 
     constexpr auto parse(const std::format_parse_context &ctx) {
-        auto pos = ctx.begin();
+        const auto *pos = ctx.begin();
         while (pos != ctx.end() && *pos != '}') {
             if (*pos == 'r' || *pos == 'R') {
                 raw = true;

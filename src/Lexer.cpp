@@ -209,6 +209,22 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 // std::println("warning: syntax error on {}:{}", line, col);
                 tokens.emplace_back(TokOp{line, col - 1, indent_level, OpType::Neg});
             }
+        } else if (*peek() == '*') {
+            consume();
+            if (peek() && *peek() == '=') {
+                consume();
+                tokens.emplace_back(TokOp{line, col - 2, indent_level, OpType::MultEq});
+            } else {
+                tokens.emplace_back(TokOp{line, col - 2, indent_level, OpType::Mult});
+            }
+        } else if (*peek() == '/') {
+            consume();
+            if (peek() && *peek() == '=') {
+                consume();
+                tokens.emplace_back(TokOp{line, col - 2, indent_level, OpType::DivEq});
+            } else {
+                tokens.emplace_back(TokOp{line, col - 2, indent_level, OpType::Div});
+            }
         }
         else {
             consume();

@@ -13,6 +13,9 @@ find it, it'll download a fresh copy.
 cmake -S . -B build # or whatever you want to call your build dir
 make -C ./build # I like to add `-j6` as an option for faster builds
 ```
+| :warning: Warning |
+|:------------------|
+| I have successfully built this on macOS and Linux. I don't see why it wouldn't work on Windows, but I haven't tried it.|
 
 # Running
 

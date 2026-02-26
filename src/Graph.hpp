@@ -6,6 +6,7 @@
 #define RPY_PROJ_ANALYZER_GRAPH_HPP
 
 #include "Node.hpp"
+#include "Token.hpp"
 
 #include <expected>
 #include <format>
@@ -83,6 +84,12 @@ class Graph {
                         idx++;
                     },
                     [&](const TokOp&) -> void {
+                        idx++;
+                    },
+                    [&](const TokLParen&) -> void {
+                        idx++;
+                    },
+                    [&](const TokRParen&) -> void {
                         idx++;
                     },
                     [&]<typename U>(U&& other) -> void {

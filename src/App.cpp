@@ -18,12 +18,6 @@ auto App::run() -> int {
     const int screen_height = ArgVParser::height ? *ArgVParser::height : 720;
     const auto f_width = static_cast<float>(screen_width);
     const auto f_height = static_cast<float>(screen_height);
-    
-    #ifndef __APPLE__
-        constexpr auto mod_key = KEY_LEFT_CONTROL;
-    #else
-        constexpr auto mod_key = KEY_LEFT_SUPER;
-    #endif //__APPLE__
 
     SetConfigFlags(FLAG_VSYNC_HINT);
 
@@ -61,7 +55,7 @@ auto App::run() -> int {
     }
 
     while (run) {
-        if ((IsKeyDown(mod_key) && IsKeyPressed(KEY_Q)) || window.ShouldClose()) {
+        if ((mod_down() && IsKeyPressed(KEY_Q)) || window.ShouldClose()) {
             run = false;
         }
 

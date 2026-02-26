@@ -114,7 +114,7 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
         }
     }
 
-    if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_D)) {
+    if (App::ctrl_down() && IsKeyPressed(KEY_D)) {
         debug = !debug;
     }
 
@@ -122,7 +122,7 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
     //     run = false;
     // }
 
-    if (!IsKeyDown(KEY_LEFT_CONTROL)) {
+    if (!App::ctrl_down()) {
         if (IsKeyDown(KEY_S)) {
             camera.target.y += 5;
         } else if (IsKeyDown(KEY_W)) {
@@ -136,18 +136,18 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
         }
     }
 
-    if (IsKeyDown(KEY_LEFT_ALT)) {
+    if (App::alt_down()) {
         scroll_speed += GetMouseWheelMove();
-    } else if (IsKeyDown(KEY_LEFT_SHIFT)) {
+    } else if (App::shift_down()) {
         camera.target.x -= (GetMouseWheelMoveV().y * scroll_speed);
-    } else if (IsKeyUp(KEY_LEFT_CONTROL)) {
+    } else if (!App::ctrl_down()) {
         camera.target.x -= GetMouseWheelMoveV().x * scroll_speed;
         camera.target.y -= GetMouseWheelMoveV().y * scroll_speed;
     }
 
     const raylib::Vector2 before_zoom = GetScreenToWorld2D(GetMousePosition(), camera);
 
-    if (IsKeyDown(KEY_LEFT_CONTROL)) {
+    if (App::ctrl_down()) {
         camera.zoom += GetMouseWheelMove() / 10;
     } else if (IsKeyPressed(KEY_MINUS) || (IsKeyPressed(KEY_KP_SUBTRACT))) {
         camera.zoom -= 0.1f;

@@ -12,7 +12,9 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <utility>
 #include <variant>
+#include <vector>
 
 enum class UnaryOp : std::uint8_t {
     Not,
@@ -183,6 +185,17 @@ struct ExprBinary : Expr {
     std::unique_ptr<Expr> lhs;
     OpType op;
     std::unique_ptr<Expr> rhs;
+
+    [[nodiscard]] auto to_string() const -> std::string override;
+};
+
+struct ExprCall : Expr {
+    explicit ExprCall(std::unique_ptr<Expr> callee, 
+            std::vector<std::unique_ptr<Expr>> args,
+            std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs);
+    std::unique_ptr<Expr> callee;
+    std::vector<std::unique_ptr<Expr>> args;
+    std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs;
 
     [[nodiscard]] auto to_string() const -> std::string override;
 };
