@@ -413,7 +413,7 @@ GraphLayout::GraphLayout(Graph& graph) {
     for (int i = 0; i < graph.get_nodes().size(); ++i) {
         const auto& n = graph.get_nodes().at(i);
         // TODO: make this *not* just assume labels are the roots
-        if (dynamic_cast<NodeLabel *>(n.get())) {
+        if (dynamic_cast<NodeLabel *>(n.get()) != nullptr) {
             groups.emplace_back(Layout::make_label(graph.get_nodes(), i, i));
         }
     }

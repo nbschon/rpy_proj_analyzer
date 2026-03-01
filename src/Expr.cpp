@@ -31,6 +31,11 @@ ExprCall::ExprCall(std::unique_ptr<Expr> callee,
     : callee(std::move(callee)), args(std::move(args)), kwargs(std::move(kwargs)) {
 }
 
+ExprCall::ExprCall(std::vector<std::unique_ptr<Expr>> args,
+            std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs)
+    : callee(nullptr), args(std::move(args)), kwargs(std::move(kwargs)) {
+}
+
 auto ExprLit::to_string() const -> std::string {
     return std::visit(
         Overload{
@@ -94,6 +99,87 @@ auto ExprCall::to_string() const -> std::string {
     return std::format("[Callee: {}, {}, {}]", callee_str, arg_str, kwarg_str);
 }
 
+auto break_up_args(std::span<const Token> toks, unsigned& start_idx) -> std::unique_ptr<ExprCall> {
+    if (std::holds_alternative<TokLParen>(toks.front()) && std::holds_alternative<TokRParen>(toks.back())) {
+        std::println("good args!!!");
+    }
+    auto idx = start_idx;
+    int n_l = 0;
+    while (idx < toks.size()) {
+        if (std::holds_alternative<TokLParen>(toks[idx])) {
+            n_l++;
+        } else if (std::holds_alternative<TokRParen>(toks[idx])) {
+            n_l--;
+        }
+
+        idx++;
+
+        if (n_l == 0) {
+            break;
+        }
+    }
+
+    // add and subtract one to strip surrounding parenthesis
+    const auto inside_parens = toks.subspan(start_idx + 1, idx - start_idx - 1);
+    for (const auto &t : inside_parens) {
+        std::println("{}", t);
+    }
+
+    // increment start_idx so we don't repeat tokens once this function is over
+    start_idx += idx - 1;
+
+    std::println("\n====================");
+
+    n_l = 0;
+    int left_idx = 0;
+    std::vector<std::span<const Token>> arg_spans;
+    for (int i = 0; i < inside_parens.size(); ++i) {
+        const auto &curr = inside_parens[i];
+        if (std::holds_alternative<TokLParen>(curr)) {
+            n_l++;
+        } else if (std::holds_alternative<TokRParen>(curr)) {
+            n_l--;
+        }
+
+        if (std::holds_alternative<TokComma>(curr) && n_l == 0) {
+            arg_spans.emplace_back(inside_parens.subspan(left_idx, i - left_idx));
+            left_idx = i + 1;
+        }
+    }
+
+    if (left_idx != inside_parens.size() - 1) {
+        arg_spans.emplace_back(inside_parens.subspan(left_idx, inside_parens.size() - 1 - left_idx));
+    }
+
+    std::vector<std::unique_ptr<Expr>> fn_args;
+    std::vector<std::pair<std::string, std::unique_ptr<Expr>>> fn_kwargs;
+
+    for (const auto &a : arg_spans) {
+        if (a.size() > 2) {
+            if (std::holds_alternative<TokIdent>(a[0]) && std::holds_alternative<TokOp>(a[1])) {
+                if (std::get<TokOp>(a[1]).type == OpType::Assign) {
+                    unsigned e_start_idx = 2;
+                    auto name = std::get<TokIdent>(a[0]).name;
+                    fn_kwargs.emplace_back(name, fold_into_expr(a, e_start_idx));
+                    continue;
+                }
+
+                std::println(std::cerr, "invalid kwarg format");
+            }
+        }
+
+        if (a.empty()) {
+            std::println(std::cerr, "empty arg! bad!");
+        } else {
+            unsigned e_start_idx = 0;
+            // auto e = fold_into_expr(a, e_start_idx);
+            fn_args.emplace_back(fold_into_expr(a, e_start_idx));
+        }
+    }
+
+    return std::make_unique<ExprCall>(std::move(fn_args), std::move(fn_kwargs));
+}
+
 /*
  * Adapted from here:
  * https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
@@ -109,6 +195,7 @@ auto fold_into_expr(std::span<const Token> toks, unsigned& idx, const float min_
         return toks[idx++];
     };
 
+    // TODO: graceful error reporting instead of crashing
     const auto lhs_tok = consume();
     auto lhs = std::visit(
         Overload{
@@ -124,7 +211,7 @@ auto fold_into_expr(std::span<const Token> toks, unsigned& idx, const float min_
             [&](const TokBoolLit& t) -> std::unique_ptr<Expr> {
                 return std::make_unique<ExprLit>(t.value);
             },
-            [&](const TokLParen& t) -> std::unique_ptr<Expr> {
+            [&](const TokLParen&) -> std::unique_ptr<Expr> {
                 auto expr = fold_into_expr(toks, idx, 0.0f);
                 assert(std::holds_alternative<TokRParen>(*peek()));
                 consume();
@@ -144,6 +231,12 @@ auto fold_into_expr(std::span<const Token> toks, unsigned& idx, const float min_
     while (true) {
         if (!peek()) {
             break;
+        }
+
+        if (std::holds_alternative<TokLParen>(*peek())) {
+            auto call = break_up_args(toks, idx);
+            call->callee = std::move(lhs);
+            lhs = std::move(call);
         }
 
         if (std::holds_alternative<TokRParen>(*peek())) {

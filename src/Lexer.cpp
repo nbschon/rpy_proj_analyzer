@@ -126,6 +126,9 @@ auto Lexer::tokenize() -> std::vector<Token> {
         } else if (*peek() == ')') {
             tokens.emplace_back(TokRParen{line, col, indent_level});
             consume();
+        } else if (*peek() == ',') {
+            tokens.emplace_back(TokComma{line, col, indent_level});
+            consume();
         } else if (*peek() == '#') {
             while (peek() && *peek() != '\n') {
                 consume();

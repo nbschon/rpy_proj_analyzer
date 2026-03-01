@@ -61,19 +61,19 @@ auto tok_str(const Token& token) -> std::string {
             ret += "Scene";
         },
         [&](const TokIdent &t) -> void {
-            ret += std::format("Identifier: \"{}\"", t.name);
+            ret += std::format("Identifier: {}", t.name);
         },
         [&](const TokStrLit &t) -> void {
-            ret += std::format("Dialogue: \"{}\"", t.text);
+            ret += std::format("String Lit.: \"{}\"", t.text);
         },
         [&](const TokNumLit &t) -> void {
-            ret += std::format("Number: \"{}\"", t.value);
+            ret += std::format("Number Lit.: {}", t.value);
         },
         [&](const TokBoolLit &t) -> void {
-            ret += std::format("Bool: \"{}\"", t.value ? "True" : "False");
+            ret += std::format("Bool Lit.: {}", t.value ? "True" : "False");
         },
         [&](const TokOp &t) -> void {
-            ret += std::format("Operator: \"{}\"", t.type);
+            ret += std::format("Operator: {}", t.type);
         },
         [&](const TokDefault &t) -> void {
             ret += "Default";

@@ -302,19 +302,19 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
-class NodeCharacter final : public Node {
-    std::string name;
-    std::string display_name;
-    std::optional<unsigned> color;
-
-public:
-    explicit NodeCharacter(const Tok& token, std::string name, std::string display_name);
-    NodeCharacter(const Tok& token, std::string name, std::string display_name, unsigned color);
-
-    [[nodiscard]] auto to_string() const -> std::string override;
-
-    [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
-};
+// class NodeCharacter final : public Node {
+//     std::string name;
+//     std::string display_name;
+//     std::optional<unsigned> color;
+//
+// public:
+//     explicit NodeCharacter(const Tok& token, std::string name, std::string display_name);
+//     NodeCharacter(const Tok& token, std::string name, std::string display_name, unsigned color);
+//
+//     [[nodiscard]] auto to_string() const -> std::string override;
+//
+//     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
+// };
 
 class NodeImage final : public Node {
     std::string char_name;

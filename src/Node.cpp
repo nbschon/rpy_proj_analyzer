@@ -441,34 +441,34 @@ auto NodeJump::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     return {this, rect, "Jump", std::move(fields)};
 }
 
-NodeCharacter::NodeCharacter(const Tok& token, std::string name, std::string display_name)
-    : Node(token), name(std::move(name)), display_name(std::move(display_name)), color(std::nullopt) {
-}
-
-NodeCharacter::NodeCharacter(const Tok& token, std::string name, std::string display_name, unsigned color)
-    : Node(token), name(std::move(name)), display_name(std::move(display_name)), color(color) {
-}
-
-auto NodeCharacter::to_string() const -> std::string {
-    if (color) {
-        return std::format(R"(Character "{}", display: "{}", color: {:06X})", name, display_name, *color);
-    }
-
-    return std::format(R"(Character "{}", display: "{}")", name, display_name);
-}
-
-auto NodeCharacter::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Character";
-    std::vector<std::string> fields;
-    fields.reserve(2);
-    if (color) {
-        fields.push_back(std::format("Name: {{color=#{:06X}}}{}{{/color}}", *color, name));
-    } else {
-        fields.push_back(std::format("Name: {}", name));
-    }
-    fields.push_back(std::format("Display name: {}", display_name));
-    return {this, rect, "Character", std::move(fields)};
-}
+// NodeCharacter::NodeCharacter(const Tok& token, std::string name, std::string display_name)
+//     : Node(token), name(std::move(name)), display_name(std::move(display_name)), color(std::nullopt) {
+// }
+//
+// NodeCharacter::NodeCharacter(const Tok& token, std::string name, std::string display_name, unsigned color)
+//     : Node(token), name(std::move(name)), display_name(std::move(display_name)), color(color) {
+// }
+//
+// auto NodeCharacter::to_string() const -> std::string {
+//     if (color) {
+//         return std::format(R"(Character "{}", display: "{}", color: {:06X})", name, display_name, *color);
+//     }
+//
+//     return std::format(R"(Character "{}", display: "{}")", name, display_name);
+// }
+//
+// auto NodeCharacter::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
+//     // constexpr std::string title = "Character";
+//     std::vector<std::string> fields;
+//     fields.reserve(2);
+//     if (color) {
+//         fields.push_back(std::format("Name: {{color=#{:06X}}}{}{{/color}}", *color, name));
+//     } else {
+//         fields.push_back(std::format("Name: {}", name));
+//     }
+//     fields.push_back(std::format("Display name: {}", display_name));
+//     return {this, rect, "Character", std::move(fields)};
+// }
 
 NodeImage::NodeImage(const Tok& token, std::string char_name, std::string attr, std::string file_path)
     : Node(token), char_name(std::move(char_name)), attr(std::move(attr)), file_path(std::move(file_path)) {

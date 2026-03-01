@@ -193,6 +193,8 @@ struct ExprCall : Expr {
     explicit ExprCall(std::unique_ptr<Expr> callee, 
             std::vector<std::unique_ptr<Expr>> args,
             std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs);
+    ExprCall(std::vector<std::unique_ptr<Expr>> args,
+            std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs);
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
     std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs;
@@ -200,6 +202,7 @@ struct ExprCall : Expr {
     [[nodiscard]] auto to_string() const -> std::string override;
 };
 
+[[nodiscard]] auto break_up_args(std::span<const Token> toks, unsigned &start_idx) -> std::unique_ptr<ExprCall>;
 [[nodiscard]] auto fold_into_expr(std::span<const Token> toks, unsigned &idx, float min_prec = 0.0) -> std::unique_ptr<Expr>;
 [[nodiscard]] auto is_valid_assign(const Expr *expr) -> bool;
 

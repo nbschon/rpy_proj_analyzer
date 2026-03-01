@@ -92,6 +92,9 @@ class Graph {
                     [&](const TokRParen&) -> void {
                         idx++;
                     },
+                    [&](const TokComma&) -> void {
+                        idx++;
+                    },
                     [&]<typename U>(U&& other) -> void {
                         using V = std::decay_t<U>;
                         static_assert(std::is_base_of_v<Tok, V>, "expected derived from base Tok");
@@ -343,7 +346,7 @@ class Graph {
                                 nodes.push_back(std::make_unique<NodeExpr>(t, *expr, std::move(new_expr), true));
                                 nodes_w_expr.push_back(nodes.back().get());
                             } else {
-                                const std::string err = std::format("invalid Default declaration at {}", tok_pos(t));
+                                const std::string err = std::format("invalid Define declaration at {}", tok_pos(t));
                                 errors.push_back(err);
                             }
                         } else {
