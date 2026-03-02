@@ -9,7 +9,6 @@
 #include "Expr.hpp"
 #include "Token.hpp"
 
-#include <cstdint>
 #include <format>
 #include <memory>
 #include <optional>
@@ -49,6 +48,15 @@ enum class NodeType : std::uint8_t {
     Call,
     Jump,
     IfChain,
+};
+
+struct ShowProps {
+    std::optional<std::string> as;
+    std::optional<std::string> at;
+    std::optional<std::string> behind;
+    std::optional<std::string> onlayer;
+    std::optional<int> zorder;
+    std::optional<std::string> trans;
 };
 
 class Node {
@@ -96,14 +104,17 @@ public:
 
 class NodeShow final : public Node {
     std::string name;
-    std::optional<std::string> attr;
-    std::optional<std::string> pos;
+    std::vector<std::string> attrs;
+    std::optional<std::string> as;
+    std::optional<std::string> at;
+    std::optional<std::string> behind;
+    std::optional<std::string> onlayer;
+    std::optional<int> zorder;
     std::optional<std::string> trans;
 
 public:
     explicit NodeShow(const Tok& token,
-                      const std::string& name, const std::optional<std::string>& attr,
-                      const std::optional<std::string>& pos, const std::optional<std::string>& trans);
+                      std::string  name, std::vector<std::string> attrs, const ShowProps& props);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 
@@ -318,11 +329,11 @@ public:
 
 class NodeImage final : public Node {
     std::string char_name;
-    std::string attr;
+    std::vector<std::string> attrs;
     std::string file_path;
 
 public:
-    explicit NodeImage(const Tok& token, std::string char_name, std::string attr, std::string file_path);
+    explicit NodeImage(const Tok& token, std::string char_name, std::vector<std::string> attrs, std::string file_path);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 

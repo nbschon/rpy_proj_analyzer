@@ -48,11 +48,23 @@ auto tok_str(const Token& token) -> std::string {
         [&](const TokChoice &t ) -> void {
             ret += "Choice";
         },
-        [&](const TokTransition &t) -> void {
+        [&](const TokWith &t) -> void {
             ret += "Transition";
         },
-        [&](const TokPos &t) -> void {
-            ret += "Position";
+        [&](const TokAs &t) -> void {
+            ret += "As";
+        },
+        [&](const TokAt &t) -> void {
+            ret += "At";
+        },
+        [&](const TokBehind &t) -> void {
+            ret += "Behind";
+        },
+        [&](const TokOnlayer &t) -> void {
+            ret += "On Layer";
+        },
+        [&](const TokZOrder &t) -> void {
+            ret += "Z Order";
         },
         [&](const TokLabel &t) -> void {
             ret += "Label";
@@ -114,9 +126,9 @@ auto tok_str(const Token& token) -> std::string {
         [&](const TokJump &t) -> void {
             ret += "Jump to";
         },
-        [&](const TokCharacter &) -> void {
-            ret += "Character";
-        },
+        // [&](const TokCharacter &) -> void {
+        //     ret += "Character";
+        // },
         [&](const TokImage &) -> void {
             ret += "Image";
         },
@@ -196,10 +208,22 @@ auto tok_color(const Token &token) -> std::uint32_t {
             [&](const TokChoice &) -> std::uint32_t {
                 return green;
             },
-            [&](const TokTransition &) -> std::uint32_t {
+            [&](const TokWith &) -> std::uint32_t {
                 return purple;
             },
-            [&](const TokPos &) -> std::uint32_t {
+            [&](const TokAs &) -> std::uint32_t {
+                return purple;
+            },
+            [&](const TokAt &) -> std::uint32_t {
+                return purple;
+            },
+            [&](const TokBehind &) -> std::uint32_t {
+                return purple;
+            },
+            [&](const TokOnlayer &) -> std::uint32_t {
+                return purple;
+            },
+            [&](const TokZOrder &) -> std::uint32_t {
                 return purple;
             },
             [&](const TokLabel &) -> std::uint32_t {
@@ -265,9 +289,9 @@ auto tok_color(const Token &token) -> std::uint32_t {
             [&](const TokNewline &) -> std::uint32_t {
                 return black;
             },
-            [&](const TokCharacter &) -> std::uint32_t {
-                return blue;
-            },
+            // [&](const TokCharacter &) -> std::uint32_t {
+            //     return blue;
+            // },
             [&](const TokImage &) -> std::uint32_t {
                 return blue;
             },

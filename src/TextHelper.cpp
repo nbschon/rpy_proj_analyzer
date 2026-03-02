@@ -403,6 +403,10 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
     bool just_wrapped = false;
     float newlines = 0;
 
+    if (line_height + cursor_y > bounds.y + bounds.height) {
+        return {0, false};
+    }
+
     auto draw_glyph = [&](const DispGlyph& glyph) {
         const auto font = font_ptr(glyph.style.font);
         const auto cp = glyph.codepoint;

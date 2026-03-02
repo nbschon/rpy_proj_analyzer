@@ -146,73 +146,80 @@ class Graph {
                     },
                     [&](const TokShow& t) {
                         idx++;
-                        std::optional<std::string> attr = std::nullopt;
-                        std::optional<std::string> pos = std::nullopt;
-                        std::optional<std::string> trans = std::nullopt;
+                        std::string name;
+                        std::vector<std::string> attrs;
+                        ShowProps props{};
 
-                        if (auto ident = expect_tok<TokIdent>(tokens, idx)) {
-                            std::string name;
-                            std::optional<unsigned> pos_idx;
-                            std::optional<unsigned> transition_idx;
+                        if (const auto char_name = expect_tok<TokIdent>(tokens, idx)) {
+                            name = char_name->name;
+                        } else {
+                            errors.push_back(char_name.error());
+                            std::println(std::cerr, "{}", char_name.error());
+                            return;
+                        }
 
-                            name = ident->name;
-                            if (auto attr_tok = expect_tok<TokIdent>(tokens, idx)) {
-                                attr = attr_tok->name;
-                            }
+                        while (std::holds_alternative<TokIdent>(tokens.at(idx))) {
+                            auto attr = expect_tok<TokIdent>(tokens, idx);
+                            // because we're already inside the loop, we already know this is valid
+                            attrs.push_back(attr->name);
+                        }
 
-                            while (!H_A(TokNewline, tokens.at(idx))) {
-                                if (const auto pos_tok = expect_tok<TokPos>(tokens, idx)) {
-                                    if (!pos_idx) {
-                                        pos_idx = idx;
-                                        if (auto pos_desc = expect_tok<TokIdent>(tokens, idx)) {
-                                            pos = pos_desc->name;
-                                        } else {
-                                            std::println(std::cerr, "{}", pos_desc.error());
-                                            return;
-                                        }
-                                    } else {
-                                        std::println(
-                                            std::cerr, "error: duplicate position in Show statement on line {}",
-                                            t.line);
-                                    }
-                                }
-
-                                if (const auto trans_tok = expect_tok<TokTransition>(tokens, idx)) {
-                                    if (!transition_idx) {
-                                        transition_idx = idx;
-                                        if (auto trans_desc = expect_tok<TokIdent>(tokens, idx)) {
-                                            trans = trans_desc->name;
-                                        } else {
-                                            std::println(std::cerr, "{}", trans_desc.error());
-                                            return;
-                                        }
-                                    } else {
-                                        std::println(
-                                            std::cerr,
-                                            "error: duplicate transition in Show statement on line {}",
-                                            t.line);
-                                    }
-                                }
-                            }
-
-                            if ((pos_idx && transition_idx) && *pos_idx >= *transition_idx) {
-                                std::println(
-                                    std::cerr,
-                                    "error: position and transition for Show statement out of order on line {}",
-                                    t.line);
+                        if (auto as_tok = expect_tok<TokAs>(tokens, idx)) {
+                            if (const auto as_ident = expect_tok<TokIdent>(tokens, idx)) {
+                                props.as = as_ident->name;
+                            } else {
+                                errors.push_back(as_ident.error());
+                                std::println(std::cerr, "{}", as_ident.error());
                                 return;
                             }
-
-                            nodes.push_back(std::make_unique<NodeShow>(*ident, name, attr, pos, trans));
-                        } else {
-                            errors.push_back(ident.error());
-                            std::println(std::cerr, "{}", ident.error());
                         }
+
+                        if (auto at_tok = expect_tok<TokAt>(tokens, idx)) {
+                            if (const auto at_pos = expect_tok<TokIdent>(tokens, idx); !at_pos) {
+                                props.at = at_pos->name;
+                            } else {
+                                errors.push_back(at_pos.error());
+                                std::println(std::cerr, "{}", at_pos.error());
+                                return;
+                            }
+                        }
+
+                        if (auto behind_tok = expect_tok<TokBehind>(tokens, idx)) {
+                            if (const auto behind_list = expect_tok<TokIdent>(tokens, idx); !behind_list) {
+                                props.behind = behind_list->name;
+                            } else {
+                                errors.push_back(behind_list.error());
+                                std::println(std::cerr, "{}", behind_list.error());
+                                return;
+                            }
+                        }
+
+                        if (auto onlayer_tok = expect_tok<TokOnlayer>(tokens, idx)) {
+                            if (const auto layer = expect_tok<TokIdent>(tokens, idx); !layer) {
+                                props.onlayer = layer->name;
+                            } else {
+                                errors.push_back(layer.error());
+                                std::println(std::cerr, "{}", layer.error());
+                                return;
+                            }
+                        }
+
+                        if (auto zorder_tok = expect_tok<TokZOrder>(tokens, idx); !zorder_tok) {
+                            if (const auto zorder = expect_tok<TokNumLit>(tokens, idx); !zorder_tok) {
+                                props.zorder = zorder->value;
+                            } else {
+                                errors.push_back(zorder.error());
+                                std::println(std::cerr, "{}", zorder.error());
+                                return;
+                            }
+                        }
+
+                        nodes.push_back(std::make_unique<NodeShow>(t, name, attrs, props));
                     },
                     [&](const TokHide& t) {
                         idx++;
                         if (auto name = expect_tok<TokIdent>(tokens, idx)) {
-                            if (auto trans = expect_tok<TokTransition>(tokens, idx)) {
+                            if (auto trans = expect_tok<TokWith>(tokens, idx)) {
                                 if (auto trans_desc = expect_tok<TokIdent>(tokens, idx)) {
                                     nodes.push_back(std::make_unique<NodeHide>(t, name->name, trans_desc->name));
                                 } else {
@@ -432,21 +439,28 @@ class Graph {
                             std::println(std::cerr, "{}", ident.error());
                         }
                     },
-                    [&](const TokCharacter &t) {
-                        idx++;
-                    },
                     [&](const TokImage &t) {
                         idx++;
+                        std::vector<std::string> attrs;
                         const auto name = expect_tok<TokIdent>(tokens, idx);
                         if (!name) {
                             errors.push_back(name.error());
                             std::println(std::cerr, "{}", name.error());
                             return;
                         }
-                        const auto attr = expect_tok<TokIdent>(tokens, idx);
-                        if (!attr) {
-                            errors.push_back(attr.error());
-                            std::println(std::cerr, "{}", attr.error());
+                        while (!std::holds_alternative<TokOp>(tokens.at(idx))) {
+                            const auto attr = expect_tok<TokIdent>(tokens, idx);
+                            if (!attr) {
+                                errors.push_back(attr.error());
+                                std::println(std::cerr, "{}", attr.error());
+                                return;
+                            }
+                            attrs.push_back(attr->name);
+                        }
+                        const auto assign = expect_tok<TokOp>(tokens, idx);
+                        if (!assign || assign->type != OpType::Assign) {
+                            errors.push_back(assign.error());
+                            std::println(std::cerr, "{}", assign.error());
                             return;
                         }
                         const auto file_path = expect_tok<TokStrLit>(tokens, idx);
@@ -455,7 +469,7 @@ class Graph {
                             std::println(std::cerr, "{}", file_path.error());
                             return;
                         }
-                        nodes.push_back(std::make_unique<NodeImage>(t, name->name, attr->name, file_path->text));
+                        nodes.push_back(std::make_unique<NodeImage>(t, name->name, std::move(attrs), file_path->text));
                     },
                     [&](const TokNewline&) {
                     },

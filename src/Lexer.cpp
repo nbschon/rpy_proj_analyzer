@@ -62,10 +62,18 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokHide{line, new_col, indent_level});
             } else if (txt_buff == "menu") {
                 tokens.emplace_back(TokMenu{line, new_col, indent_level});
-            } else if (txt_buff == "with") {
-                tokens.emplace_back(TokTransition{line, new_col, indent_level});
+            } else if (txt_buff == "as") {
+                tokens.emplace_back(TokAs{line, new_col, indent_level});
             } else if (txt_buff == "at") {
-                tokens.emplace_back(TokPos{line, new_col, indent_level});
+                tokens.emplace_back(TokAt{line, new_col, indent_level});
+            } else if (txt_buff == "behind") {
+                tokens.emplace_back(TokBehind{line, new_col, indent_level});
+            } else if (txt_buff == "onlayer") {
+                tokens.emplace_back(TokOnlayer{line, new_col, indent_level});
+            } else if (txt_buff == "zorder") {
+                tokens.emplace_back(TokZOrder{line, new_col, indent_level});
+            } else if (txt_buff == "with") {
+                tokens.emplace_back(TokWith{line, new_col, indent_level});
             } else if (txt_buff == "label") {
                 tokens.emplace_back(TokLabel{line, new_col, indent_level});
             } else if (txt_buff == "scene") {
@@ -108,7 +116,10 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokCall{line, new_col, indent_level});
             } else if (txt_buff == "jump") {
                 tokens.emplace_back(TokJump{line, new_col, indent_level});
-            } else {
+            } else if (txt_buff == "image") {
+                tokens.emplace_back(TokImage{line, new_col, indent_level});
+            }
+            else {
                 tokens.emplace_back(TokIdent{line, new_col, indent_level, txt_buff});
             }
             txt_buff.clear();

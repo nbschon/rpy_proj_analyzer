@@ -45,22 +45,39 @@ auto NodeParent::has_children() const -> bool {
     return true;
 }
 
-NodeShow::NodeShow(const Tok& token, const std::string& name, const std::optional<std::string>& attr,
-                   const std::optional<std::string>& pos, const std::optional<std::string>& trans)
-    : Node(token) {
-    this->name = name;
-    this->attr = attr;
-    this->pos = pos;
-    this->trans = trans;
+NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> attrs,
+                   const ShowProps& props)
+    : Node(token), name(std::move(name)), attrs(std::move(attrs)) {
+    if (props.as) {
+        as = std::move(props.as);
+    }
+    if (props.at) {
+        at = std::move(props.at);
+    }
+    if (props.behind) {
+        behind = std::move(props.behind);
+    }
+    if (props.onlayer) {
+        onlayer = std::move(props.onlayer);
+    }
+    if (props.zorder) {
+        zorder = std::move(props.zorder);
+    }
 }
 
 auto NodeShow::to_string() const -> std::string {
     auto ret = std::format("Show: \"{}\"", name);
-    if (attr) {
-        ret += std::format(" w/ attr \"{}\"", *attr);
+    // if (attr) {
+    //     ret += std::format(" w/ attr \"{}\"", *attr);
+    // }
+    if (!attrs.empty()) {
+        ret += std::ranges::fold_left(attrs, " w/ attrs ", [](std::string out, const std::string& s) {
+            out += std::format("\"{}\", ", s);
+            return out;
+        });
     }
-    if (pos) {
-        ret += std::format(" at pos \"{}\"", *pos);
+    if (at) {
+        ret += std::format(" at pos \"{}\"", *at);
     }
     if (trans) {
         ret += std::format(" w/ trans. \"{}\"", *trans);
@@ -71,10 +88,16 @@ auto NodeShow::to_string() const -> std::string {
 auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     // constexpr std::string title = "Show";
     std::vector<std::string> fields;
-    fields.reserve(1 + attr.has_value() + pos.has_value() + trans.has_value());
+    fields.reserve(1 + attrs.size() + at.has_value() + trans.has_value());
     fields.push_back(std::format("Character: {}", name));
-    if (attr) { fields.push_back(std::format("Attribute: {}", *attr)); }
-    if (pos) { fields.push_back(std::format("Position: {}", *pos)); }
+    if (!attrs.empty()) {
+        const auto attrs_str = std::ranges::fold_left(attrs, "Attributes: ", [](std::string out, const std::string& s) {
+                out += std::format("\"{}\", ", s);
+                return out;
+            });
+        fields.push_back(attrs_str);
+    }
+    if (at) { fields.push_back(std::format("Position: {}", *at)); }
     if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
     return {this, rect, "Show", std::move(fields)};
 }
@@ -470,12 +493,12 @@ auto NodeJump::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
 //     return {this, rect, "Character", std::move(fields)};
 // }
 
-NodeImage::NodeImage(const Tok& token, std::string char_name, std::string attr, std::string file_path)
-    : Node(token), char_name(std::move(char_name)), attr(std::move(attr)), file_path(std::move(file_path)) {
+NodeImage::NodeImage(const Tok& token, std::string char_name, std::vector<std::string> attrs, std::string file_path)
+    : Node(token), char_name(std::move(char_name)), attrs(std::move(attrs)), file_path(std::move(file_path)) {
 }
 
 auto NodeImage::to_string() const -> std::string {
-    return std::format(R"(Image "{} {}", path: "{}")", char_name, attr, file_path);
+    return std::format(R"(Image "{} {}", path: "{}")", char_name, attrs, file_path);
 }
 
 auto NodeImage::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
@@ -483,7 +506,10 @@ auto NodeImage::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::vector<std::string> fields;
     fields.reserve(3);
     fields.push_back(std::format("Character: \"{}\"", char_name));
-    fields.push_back(std::format("Attribute: \"{}\"", attr));
+    fields.push_back(std::format("Attributes:"));
+    for (const auto &a : attrs) {
+        fields.push_back(std::format("\t{}", a));
+    }
     fields.push_back(std::format("File path: \"{}\"", file_path));
     return {this, rect, "Image", std::move(fields)};
 }

@@ -96,12 +96,28 @@ struct TokChoice : Tok {
     static constexpr std::string_view type_name = "Choice";
 };
 
-struct TokTransition : Tok {
+struct TokWith : Tok {
     static constexpr std::string_view type_name = "Transition";
 };
 
-struct TokPos : Tok {
+struct TokAt : Tok {
     static constexpr std::string_view type_name = "Position";
+};
+
+struct TokAs : Tok {
+    static constexpr std::string_view type_name = "As";
+};
+
+struct TokBehind : Tok {
+    static constexpr std::string_view type_name = "Behind";
+};
+
+struct TokOnlayer : Tok {
+    static constexpr std::string_view type_name = "On Layer";
+};
+
+struct TokZOrder : Tok {
+    static constexpr std::string_view type_name = "Z Order";
 };
 
 struct TokLabel : Tok {
@@ -219,8 +235,12 @@ using Token = std::variant<
     TokHide,
     TokMenu,
     TokChoice,
-    TokTransition,
-    TokPos,
+    TokAs,
+    TokAt,
+    TokBehind,
+    TokOnlayer,
+    TokZOrder,
+    TokWith,
     TokLabel,
     TokScene,
     TokIdent,
@@ -241,7 +261,7 @@ using Token = std::variant<
     TokReturn,
     TokCall,
     TokJump,
-    TokCharacter,
+    // TokCharacter,
     TokImage,
     TokNewline,
     TokTab>;
@@ -355,11 +375,23 @@ auto tok_name() -> std::string_view {
             [&](const TokChoice &) -> std::string {
                 return "ch";
             },
-            [&](const TokTransition &) -> std::string {
-                return "with";
-            },
-            [&](const TokPos &) -> std::string {
+            [&](const TokAt &) -> std::string {
                 return "at";
+            },
+            [&](const TokAs &) -> std::string {
+                return "as";
+            },
+            [&](const TokBehind &) -> std::string {
+                return "behind";
+            },
+            [&](const TokOnlayer &) -> std::string {
+                return "onlayer";
+            },
+            [&](const TokZOrder &) -> std::string {
+                return "zorder";
+            },
+            [&](const TokWith &) -> std::string {
+                return "with";
             },
             [&](const TokLabel &) -> std::string {
                 return "label";
@@ -421,9 +453,9 @@ auto tok_name() -> std::string_view {
             [&](const TokJump &) -> std::string {
                 return "jump";
             },
-            [&](const TokCharacter &) -> std::string {
-                return "Character";
-            },
+            // [&](const TokCharacter &) -> std::string {
+            //     return "Character";
+            // },
             [&](const TokImage &) -> std::string {
                 return "image";
             },

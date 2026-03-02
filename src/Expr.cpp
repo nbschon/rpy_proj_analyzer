@@ -121,14 +121,8 @@ auto break_up_args(std::span<const Token> toks, unsigned& start_idx) -> std::uni
 
     // add and subtract one to strip surrounding parenthesis
     const auto inside_parens = toks.subspan(start_idx + 1, idx - start_idx - 1);
-    for (const auto &t : inside_parens) {
-        std::println("{}", t);
-    }
-
     // increment start_idx so we don't repeat tokens once this function is over
     start_idx += idx - 1;
-
-    std::println("\n====================");
 
     n_l = 0;
     int left_idx = 0;
