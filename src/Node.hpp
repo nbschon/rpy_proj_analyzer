@@ -59,6 +59,11 @@ struct ShowProps {
     std::optional<std::string> trans;
 };
 
+struct HideProps {
+    std::optional<std::string> onlayer;
+    std::optional<std::string> trans;
+};
+
 class Node {
 protected:
     unsigned line = 0;
@@ -114,7 +119,7 @@ class NodeShow final : public Node {
 
 public:
     explicit NodeShow(const Tok& token,
-                      std::string  name, std::vector<std::string> attrs, const ShowProps& props);
+                      std::string name, std::vector<std::string> attrs, ShowProps& props);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 
@@ -123,10 +128,11 @@ public:
 
 class NodeHide final : public Node {
     std::string name;
+    std::optional<std::string> onlayer;
     std::optional<std::string> trans;
 
 public:
-    explicit NodeHide(const Tok& token, std::string name, const std::optional<std::string>& trans);
+    explicit NodeHide(const Tok& token, std::string name, HideProps& props);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 

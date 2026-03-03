@@ -45,8 +45,7 @@ auto NodeParent::has_children() const -> bool {
     return true;
 }
 
-NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> attrs,
-                   const ShowProps& props)
+NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> attrs, ShowProps& props)
     : Node(token), name(std::move(name)), attrs(std::move(attrs)) {
     if (props.as) {
         as = std::move(props.as);
@@ -102,9 +101,14 @@ auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     return {this, rect, "Show", std::move(fields)};
 }
 
-NodeHide::NodeHide(const Tok& token, std::string name, const std::optional<std::string>& trans)
-    : Node(token), name(std::move(name)), trans(trans) {
-    // type = NodeType::Hide;
+NodeHide::NodeHide(const Tok& token, std::string name, HideProps &props)
+    : Node(token), name(std::move(name)) {
+    if (props.onlayer) {
+        onlayer = props.onlayer;
+    }
+    if (props.trans) {
+        trans = props.trans;
+    }
 }
 
 auto NodeHide::to_string() const -> std::string {
