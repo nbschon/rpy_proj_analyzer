@@ -13,8 +13,19 @@
 #include <iostream>
 #include <print>
 #include <span>
+#include <type_traits>
 
 #define H_A(t, tok) std::holds_alternative<t>(tok)
+
+template<class T, class... Us>
+struct token_has;
+
+template<class T, class... Us>
+struct token_has<T, std::variant<Us...>>
+    : std::bool_constant<(std::is_same_v<T, Us> || ...)> {};
+
+template <class T>
+concept InTokens = token_has<T, std::remove_cvref_t<Token>>::value;
 
 class Graph {
     std::vector<std::unique_ptr<Node>> nodes;
@@ -22,6 +33,8 @@ class Graph {
     std::vector<bool> visited;
     std::vector<std::string> errors;
     std::vector<Node*> nodes_w_expr;
+
+    unsigned idx = 0;
 
     /*
      * This function and the next are marked as const because the linter kept
@@ -49,7 +62,8 @@ class Graph {
     Overload(Ts...) -> Overload<Ts...>;
 
     template<typename T>
-    [[nodiscard]] auto expect_tok(const std::vector<Token>& tokens, unsigned& idx) -> std::expected<T, std::string> {
+    requires InTokens<T>
+    [[nodiscard]] auto expect_tok(const std::vector<Token>& tokens) -> std::expected<T, std::string> {
         auto const& tok = tokens.at(idx);
         if (std::holds_alternative<T>(tok)) {
             return std::get<T>(tokens.at(idx++));
@@ -62,7 +76,7 @@ class Graph {
     }
 
     template<typename T>
-    [[nodiscard]] auto build_expr(const std::vector<Token>& tokens, unsigned& idx) -> std::expected<std::span<const Token>, std::string> {
+    [[nodiscard]] auto build_expr(const std::vector<Token>& tokens) -> std::expected<std::span<const Token>, std::string> {
         std::string error_msg;
 
         const std::size_t start_idx = idx;
@@ -115,11 +129,11 @@ class Graph {
     }
 
     template<typename T>
-    [[nodiscard]] auto add_cond_node(const std::vector<Token>& tokens, unsigned& idx, const Tok& t)
+    [[nodiscard]] auto add_cond_node(const std::vector<Token>& tokens, const Tok& t)
         -> std::unique_ptr<Node> {
         idx++;
 
-        const auto expr = build_expr<TokColon>(tokens, idx);
+        const auto expr = build_expr<TokColon>(tokens);
         if (expr) {
             return std::make_unique<T>(t, *expr);
         }
