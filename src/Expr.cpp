@@ -39,8 +39,11 @@ ExprCall::ExprCall(std::vector<std::unique_ptr<Expr>> args,
 auto ExprLit::to_string() const -> std::string {
     return std::visit(
         Overload{
+            [&](const int& val) -> std::string {
+                return std::format("[Integer Literal: {}]", val);
+            },
             [&](const double& val) -> std::string {
-                return std::format("[Numeric Literal: {}]", val);
+                return std::format("[Float Literal: {}]", val);
             },
             [&](const bool& val) -> std::string {
                 return std::format("[Boolean Literal: {}]", val);
@@ -199,7 +202,10 @@ auto fold_into_expr(std::span<const Token> toks, unsigned& idx, const float min_
             [&](const TokStrLit& t) -> std::unique_ptr<Expr> {
                 return std::make_unique<ExprLit>(t.text);
             },
-            [&](const TokNumLit& t) -> std::unique_ptr<Expr> {
+            [&](const TokIntLit& t) -> std::unique_ptr<Expr> {
+                return std::make_unique<ExprLit>(t.value);
+            },
+            [&](const TokFloatLit& t) -> std::unique_ptr<Expr> {
                 return std::make_unique<ExprLit>(t.value);
             },
             [&](const TokBoolLit& t) -> std::unique_ptr<Expr> {

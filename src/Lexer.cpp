@@ -41,7 +41,11 @@ void Lexer::parse_num(const bool starts_neg) {
         }
     }
     const unsigned new_col = col - num_buff.length();
-    tokens.emplace_back(TokNumLit{line, new_col, indent_level, std::stod(num_buff)});
+    if (pt_count == 0) {
+        tokens.emplace_back(TokIntLit{line, new_col, indent_level, std::stoi(num_buff)});
+    } else {
+        tokens.emplace_back(TokFloatLit{line, new_col, indent_level, std::stod(num_buff)});
+    }
     if (pt_count > 1) {
         std::println(std::cerr, "warning: incorrect number format on line {}", line);
     }

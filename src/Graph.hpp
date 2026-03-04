@@ -18,14 +18,14 @@
 #define H_A(t, tok) std::holds_alternative<t>(tok)
 
 template<class T, class... Us>
-struct token_has;
+struct variant_has;
 
 template<class T, class... Us>
-struct token_has<T, std::variant<Us...>>
+struct variant_has<T, std::variant<Us...>>
     : std::bool_constant<(std::is_same_v<T, Us> || ...)> {};
 
 template <class T>
-concept InTokens = token_has<T, std::remove_cvref_t<Token>>::value;
+concept InTokens = variant_has<T, std::remove_cvref_t<Token>>::value;
 
 class Graph {
     std::vector<std::unique_ptr<Node>> nodes;
@@ -63,7 +63,7 @@ class Graph {
 
     template<typename T>
     requires InTokens<T>
-    [[nodiscard]] auto expect_tok(const std::vector<Token>& tokens) -> std::expected<T, std::string> {
+    [[nodiscard]] auto expect(const std::vector<Token>& tokens) -> std::expected<T, std::string> {
         auto const& tok = tokens.at(idx);
         if (std::holds_alternative<T>(tok)) {
             return std::get<T>(tokens.at(idx++));
@@ -75,8 +75,12 @@ class Graph {
         return std::unexpected(std::format("expected {}, got {}", tok_name<T>(), actual));
     }
 
+    // the template argument is the token by which the expression slice is delimited.
+    // for most things, it's a newline, but for things that need a new indentation,
+    // it's a colon instead.
     template<typename T>
-    [[nodiscard]] auto build_expr(const std::vector<Token>& tokens) -> std::expected<std::span<const Token>, std::string> {
+    requires InTokens<T>
+    [[nodiscard]] auto expr_slice(const std::vector<Token>& tokens) -> std::expected<std::span<const Token>, std::string> {
         std::string error_msg;
 
         const std::size_t start_idx = idx;
@@ -91,7 +95,10 @@ class Graph {
                     [&](const TokStrLit&) -> void {
                         idx++;
                     },
-                    [&](const TokNumLit&) -> void {
+                    [&](const TokIntLit&) -> void {
+                        idx++;
+                    },
+                    [&](const TokFloatLit&) -> void {
                         idx++;
                     },
                     [&](const TokBoolLit&) -> void {
@@ -133,7 +140,7 @@ class Graph {
         -> std::unique_ptr<Node> {
         idx++;
 
-        const auto expr = build_expr<TokColon>(tokens);
+        const auto expr = expr_slice<TokColon>(tokens);
         if (expr) {
             return std::make_unique<T>(t, *expr);
         }

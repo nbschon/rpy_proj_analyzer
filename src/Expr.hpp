@@ -152,7 +152,7 @@ inline auto binary_str(const BinaryOp &op) -> std::string {
     }
 }
 
-using Literal = std::variant<double, bool, std::string>;
+using Literal = std::variant<int, double, bool, std::string>;
 
 struct Expr {
     virtual ~Expr() = default;

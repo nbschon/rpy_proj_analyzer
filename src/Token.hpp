@@ -138,8 +138,14 @@ struct TokStrLit : Tok {
     static constexpr std::string_view type_name = "String Literal";
 };
 
-struct TokNumLit : Tok {
-    static constexpr std::string_view type_name = "Numeric Literal";
+struct TokIntLit : Tok {
+    int value;
+    static constexpr std::string_view type_name = "Integer Literal";
+};
+
+struct TokFloatLit : Tok {
+    static constexpr std::string_view type_name = "Float Literal";
+    // they're called `float` in Python, but are actually double precision. Go figure.
     double value;
 };
 
@@ -245,7 +251,8 @@ using Token = std::variant<
     TokScene,
     TokIdent,
     TokStrLit,
-    TokNumLit,
+    TokIntLit,
+    TokFloatLit,
     TokBoolLit,
     TokOp,
     TokDefault,
@@ -405,7 +412,10 @@ auto tok_name() -> std::string_view {
             [&](const TokStrLit &t) -> std::string {
                 return t.text;
             },
-            [&](const TokNumLit &t) -> std::string {
+            [&](const TokIntLit &t) -> std::string {
+                return std::format("{}", t.value);
+            },
+            [&](const TokFloatLit &t) -> std::string {
                 return std::format("{}", t.value);
             },
             [&](const TokBoolLit &t) -> std::string {

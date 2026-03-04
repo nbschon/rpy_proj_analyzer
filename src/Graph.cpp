@@ -117,7 +117,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
             Overload{
                 [&](const TokDollarSign& t) {
                     idx++;
-                    if (auto expr = build_expr<TokNewline>(tokens); expr) {
+                    if (auto expr = expr_slice<TokNewline>(tokens); expr) {
                         nodes.push_back(std::make_unique<NodeExpr>(t, *expr));
                         nodes_w_expr.push_back(nodes.back().get());
                     } else {
@@ -131,7 +131,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     std::vector<std::string> attrs;
                     ShowProps props{};
 
-                    if (auto char_name = expect_tok<TokIdent>(tokens)) {
+                    if (auto char_name = expect<TokIdent>(tokens)) {
                         name = char_name->name;
                     } else {
                         errors.push_back(std::move(char_name.error()));
@@ -140,13 +140,13 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     }
 
                     while (std::holds_alternative<TokIdent>(tokens.at(idx))) {
-                        auto attr = expect_tok<TokIdent>(tokens);
+                        auto attr = expect<TokIdent>(tokens);
                         // because we're already inside the loop, we already know this is valid
                         attrs.push_back(attr->name);
                     }
 
-                    if (const auto as_tok = expect_tok<TokAs>(tokens)) {
-                        if (auto as_ident = expect_tok<TokIdent>(tokens)) {
+                    if (const auto as_tok = expect<TokAs>(tokens)) {
+                        if (auto as_ident = expect<TokIdent>(tokens)) {
                             props.as = as_ident->name;
                         } else {
                             errors.push_back(std::move(as_ident.error()));
@@ -155,8 +155,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         }
                     }
 
-                    if (const auto at_tok = expect_tok<TokAt>(tokens)) {
-                        if (auto at_pos = expect_tok<TokIdent>(tokens)) {
+                    if (const auto at_tok = expect<TokAt>(tokens)) {
+                        if (auto at_pos = expect<TokIdent>(tokens)) {
                             props.at = at_pos->name;
                         } else {
                             errors.push_back(std::move(at_pos.error()));
@@ -165,8 +165,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         }
                     }
 
-                    if (const auto behind_tok = expect_tok<TokBehind>(tokens)) {
-                        if (auto behind_list = expect_tok<TokIdent>(tokens)) {
+                    if (const auto behind_tok = expect<TokBehind>(tokens)) {
+                        if (auto behind_list = expect<TokIdent>(tokens)) {
                             props.behind = behind_list->name;
                         } else {
                             errors.push_back(std::move(behind_list.error()));
@@ -175,8 +175,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         }
                     }
 
-                    if (const auto onlayer_tok = expect_tok<TokOnlayer>(tokens)) {
-                        if (const auto layer = expect_tok<TokIdent>(tokens)) {
+                    if (const auto onlayer_tok = expect<TokOnlayer>(tokens)) {
+                        if (const auto layer = expect<TokIdent>(tokens)) {
                             props.onlayer = layer->name;
                         } else {
                             errors.push_back(std::move(layer.error()));
@@ -185,8 +185,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         }
                     }
 
-                    if (const auto zorder_tok = expect_tok<TokZOrder>(tokens)) {
-                        if (auto zorder = expect_tok<TokNumLit>(tokens)) {
+                    if (const auto zorder_tok = expect<TokZOrder>(tokens)) {
+                        if (auto zorder = expect<TokIntLit>(tokens)) {
                             props.zorder = zorder->value;
                         } else {
                             errors.push_back(std::move(zorder.error()));
@@ -195,8 +195,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         }
                     }
 
-                    if (const auto with_tok = expect_tok<TokWith>(tokens)) {
-                        if (auto trans = expect_tok<TokIdent>(tokens)) {
+                    if (const auto with_tok = expect<TokWith>(tokens)) {
+                        if (auto trans = expect<TokIdent>(tokens)) {
                             props.trans = trans->name;
                         } else {
                             errors.push_back(std::move(trans.error()));
@@ -211,7 +211,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     idx++;
                     std::string name;
                     HideProps props{};
-                    if (auto char_name = expect_tok<TokIdent>(tokens)) {
+                    if (auto char_name = expect<TokIdent>(tokens)) {
                         name = char_name->name;
                     } else {
                         errors.push_back(std::move(char_name.error()));
@@ -219,8 +219,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         return;
                     }
 
-                    if (const auto onlayer_tok = expect_tok<TokOnlayer>(tokens)) {
-                        if (auto layer = expect_tok<TokIdent>(tokens)) {
+                    if (const auto onlayer_tok = expect<TokOnlayer>(tokens)) {
+                        if (auto layer = expect<TokIdent>(tokens)) {
                             props.onlayer = layer->name;
                         } else {
                             errors.push_back(std::move(layer.error()));
@@ -229,8 +229,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         }
                     }
 
-                    if (const auto with = expect_tok<TokWith>(tokens)) {
-                        if (auto trans = expect_tok<TokIdent>(tokens)) {
+                    if (const auto with = expect<TokWith>(tokens)) {
+                        if (auto trans = expect<TokIdent>(tokens)) {
                             props.trans = trans->name;
                         } else {
                             errors.push_back(std::move(trans.error()));
@@ -245,7 +245,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     idx++;
                     std::optional<std::string> set = std::nullopt;
                     std::optional<std::string> text;
-                    if (auto colon = expect_tok<TokColon>(tokens); !colon) {
+                    if (auto colon = expect<TokColon>(tokens); !colon) {
                         errors.push_back(std::move(colon.error()));
                         std::println(std::cerr, "{}", errors.back());
                         return;
@@ -255,8 +255,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         idx++;
                     }
 
-                    if (const auto set_tok = expect_tok<TokSet>(tokens)) {
-                        if (auto ident = expect_tok<TokIdent>(tokens);
+                    if (const auto set_tok = expect<TokSet>(tokens)) {
+                        if (auto ident = expect<TokIdent>(tokens);
                             ident && set_tok->indent == t.indent + 1) {
                             set = ident->name;
                             while (!H_A(TokNewline, tokens.at(idx)) && !H_A(TokTab, tokens.at(idx))) {
@@ -271,11 +271,11 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
 
                     std::unique_ptr<NodeChoice> choice = nullptr;
 
-                    if (const auto str_tok = expect_tok<TokStrLit>(tokens)) {
-                        if (auto newline = expect_tok<TokNewline>(tokens);
+                    if (const auto str_tok = expect<TokStrLit>(tokens)) {
+                        if (auto newline = expect<TokNewline>(tokens);
                             newline && str_tok->indent == t.indent + 1) {
                             text = str_tok->text;
-                        } else if (const auto colon = expect_tok<TokColon>(tokens)) {
+                        } else if (const auto colon = expect<TokColon>(tokens)) {
                             choice = std::make_unique<NodeChoice>(*colon, str_tok->text);
                         } else {
                             errors.push_back(std::move(newline.error()));
@@ -291,14 +291,14 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokLabel& t) {
                     idx++;
-                    auto ident = expect_tok<TokIdent>(tokens);
+                    auto ident = expect<TokIdent>(tokens);
                     if (!ident) {
                         errors.push_back(std::move(ident.error()));
                         std::println(std::cerr, "{}", errors.back());
                         return;
                     }
 
-                    if (auto colon = expect_tok<TokColon>(tokens); !colon) {
+                    if (auto colon = expect<TokColon>(tokens); !colon) {
                         errors.push_back(std::move(colon.error()));
                         std::println(std::cerr, "{}", errors.back());
                         return;
@@ -307,7 +307,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokScene& t) {
                     idx++;
-                    if (auto ident = expect_tok<TokIdent>(tokens)) {
+                    if (auto ident = expect<TokIdent>(tokens)) {
                         nodes.push_back(std::make_unique<NodeScene>(t, ident->name));
                     } else {
                         errors.push_back(std::move(ident.error()));
@@ -316,7 +316,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokIdent& t) {
                     idx++;
-                    if (auto str_lit = expect_tok<TokStrLit>(tokens)) {
+                    if (auto str_lit = expect<TokStrLit>(tokens)) {
                         nodes.push_back(std::make_unique<NodeDialogue>(t, t.name, str_lit->text));
                     } else {
                         errors.push_back(std::move(str_lit.error()));
@@ -325,9 +325,9 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokStrLit& t) {
                     idx++;
-                    if (const auto colon = expect_tok<TokColon>(tokens)) {
+                    if (const auto colon = expect<TokColon>(tokens)) {
                         nodes.push_back(std::make_unique<NodeChoice>(t, t.text));
-                    } else if (auto newline = expect_tok<TokNewline>(tokens)) {
+                    } else if (auto newline = expect<TokNewline>(tokens)) {
                         nodes.push_back(std::make_unique<NodeDialogue>(t, t.text));
                     } else {
                         errors.push_back(std::move(newline.error()));
@@ -336,7 +336,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokDefault &t) {
                     idx++;
-                    if (auto expr = build_expr<TokNewline>(tokens); expr) {
+                    if (auto expr = expr_slice<TokNewline>(tokens)) {
                         unsigned e_idx = 0;
                         auto new_expr = fold_into_expr(*expr, e_idx);
                         if (is_valid_assign(new_expr.get())) {
@@ -352,7 +352,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokDefine &t) {
                     idx++;
-                    if (auto expr = build_expr<TokNewline>(tokens)) {
+                    if (auto expr = expr_slice<TokNewline>(tokens)) {
                         unsigned e_idx = 0;
                         auto new_expr = fold_into_expr(*expr, e_idx);
                         if (is_valid_assign(new_expr.get())) {
@@ -369,16 +369,16 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 [&](const TokPlay& t) {
                     idx++;
                     AudioChannel channel;
-                    if (auto music = expect_tok<TokMusic>(tokens)) {
+                    if (auto music = expect<TokMusic>(tokens)) {
                         channel = AudioChannel::Music;
-                    } else if (const auto sfx = expect_tok<TokSfx>(tokens)) {
+                    } else if (const auto sfx = expect<TokSfx>(tokens)) {
                         channel = AudioChannel::Sfx;
                     } else {
                         errors.push_back(std::move(music.error()));
                         std::println(std::cerr, "{}", errors.back());
                     }
 
-                    if (auto path = expect_tok<TokStrLit>(tokens)) {
+                    if (auto path = expect<TokStrLit>(tokens)) {
                         nodes.push_back(std::make_unique<NodePlay>(t, channel, path->text));
                     } else {
                         errors.push_back(std::move(path.error()));
@@ -399,7 +399,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokElse& t) {
                     idx++;
-                    if (auto colon = expect_tok<TokColon>(tokens)) {
+                    if (auto colon = expect<TokColon>(tokens)) {
                         nodes.push_back(std::make_unique<NodeElse>(t));
                     } else {
                         errors.push_back(std::move(colon.error()));
@@ -414,7 +414,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokReturn& t) {
                     idx++;
-                    if (auto expr = build_expr<TokNewline>(tokens)) {
+                    if (auto expr = expr_slice<TokNewline>(tokens)) {
                         if (expr->empty()) {
                             nodes.push_back(std::make_unique<NodeReturn>(t));
                         } else {
@@ -428,7 +428,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokCall& t) {
                     idx++;
-                    if (auto ident = expect_tok<TokIdent>(tokens)) {
+                    if (auto ident = expect<TokIdent>(tokens)) {
                         nodes.push_back(std::make_unique<NodeCall>(t, ident->name));
                     } else {
                         errors.push_back(std::move(ident.error()));
@@ -437,7 +437,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokJump& t) {
                     idx++;
-                    if (auto ident = expect_tok<TokIdent>(tokens)) {
+                    if (auto ident = expect<TokIdent>(tokens)) {
                         nodes.push_back(std::make_unique<NodeCall>(t, ident->name));
                     } else {
                         errors.push_back(std::move(ident.error()));
@@ -447,7 +447,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 [&](const TokImage &t) {
                     idx++;
                     std::vector<std::string> attrs;
-                    auto name = expect_tok<TokIdent>(tokens);
+                    auto name = expect<TokIdent>(tokens);
                     if (!name) {
                         errors.push_back(std::move(name.error()));
                         std::println(std::cerr, "{}", errors.back());
@@ -455,7 +455,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     }
 
                     while (!std::holds_alternative<TokOp>(tokens.at(idx))) {
-                        auto attr = expect_tok<TokIdent>(tokens);
+                        auto attr = expect<TokIdent>(tokens);
                         if (!attr) {
                             errors.push_back(std::move(attr.error()));
                             std::println(std::cerr, "{}", errors.back());
@@ -464,14 +464,14 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         attrs.push_back(attr->name);
                     }
 
-                    auto assign = expect_tok<TokOp>(tokens);
+                    auto assign = expect<TokOp>(tokens);
                     if (!assign || assign->type != OpType::Assign) {
                         errors.push_back(std::move(assign.error()));
                         std::println(std::cerr, "{}", errors.back());
                         return;
                     }
 
-                    auto file_path = expect_tok<TokStrLit>(tokens);
+                    auto file_path = expect<TokStrLit>(tokens);
                     if (!file_path) {
                         errors.push_back(std::move(file_path.error()));
                         std::println(std::cerr, "{}", errors.back());
@@ -549,7 +549,7 @@ void Graph::print_as_graph() {
 }
 
 void Graph::print_all_nodes() const {
-    for (const auto &n: nodes) {
+    for (const auto &n : nodes) {
         std::println("{}", *n);
 
         // if (const auto *chain = dynamic_cast<NodeIfChain *>(n.get())) {

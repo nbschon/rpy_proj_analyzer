@@ -78,8 +78,11 @@ auto tok_str(const Token& token) -> std::string {
         [&](const TokStrLit &t) -> void {
             ret += std::format("String Lit.: \"{}\"", t.text);
         },
-        [&](const TokNumLit &t) -> void {
-            ret += std::format("Number Lit.: {}", t.value);
+        [&](const TokIntLit &t) -> void {
+            ret += std::format("Integer Lit.: {}", t.value);
+        },
+        [&](const TokFloatLit &t) -> void {
+            ret += std::format("Float Lit.: {}", t.value);
         },
         [&](const TokBoolLit &t) -> void {
             ret += std::format("Bool Lit.: {}", t.value ? "True" : "False");
@@ -238,7 +241,10 @@ auto tok_color(const Token &token) -> std::uint32_t {
             [&](const TokStrLit &) -> std::uint32_t {
                 return green;
             },
-            [&](const TokNumLit &) -> std::uint32_t {
+            [&](const TokIntLit &) -> std::uint32_t {
+                return green;
+            },
+            [&](const TokFloatLit &) -> std::uint32_t {
                 return green;
             },
             [&](const TokBoolLit &) -> std::uint32_t {
