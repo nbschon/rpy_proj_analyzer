@@ -42,16 +42,9 @@ class Graph {
      * Not sure what best practice is in a case like this.
      */
     void connect_nodes() const;
-
     void connect_nexts() const;
 
     auto assign_scores(unsigned idx, double curr_score, OpType op) -> double;
-
-    // template<class T, class... Ts>
-    // static constexpr bool is_enum(T in, Ts... enums) {
-    //     static_assert((std::is_same_v<T, Ts> && ...), "all args must be the same enum.");
-    //     return ((in == enums) || ...);
-    // }
 
     template<class... Ts>
     struct Overload : Ts... {

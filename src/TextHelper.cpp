@@ -309,7 +309,7 @@ void TextHelper::unload_fonts() {
     }
 }
 
-auto TextHelper::draw_text(const std::string_view text, const int width, const raylib::Vector2 pos, int rel_line) -> int {
+auto TextHelper::draw_text(const std::string_view text, const raylib::Vector2 pos, const int width, const int rel_line) -> int {
     const auto [ds, _] = into_displayables(text);
 
     constexpr float line_height = font_size;
@@ -342,7 +342,7 @@ auto TextHelper::draw_text(const std::string_view text, const int width, const r
                         [](const float w, const DispGlyph& dg) {
                             return w + dg.advance;
                         });
-                    if (word_width > pos.x + width) {
+                    if (word_width > pos.x + width && width > 0) {
                         // if whole word is longer than box, wrap it
                         auto split = split_displayable(dgs, width);
                         for (const auto &split_dgs : split) {
@@ -352,7 +352,7 @@ auto TextHelper::draw_text(const std::string_view text, const int width, const r
                             reset_cursor();
                             just_wrapped = true;
                         }
-                    } else if (word_width + cursor_x > pos.x + width) {
+                    } else if (word_width + cursor_x > pos.x + width && width > 0) {
                         // if word goes beyond box, push to next line
                         reset_cursor();
                         for (const auto &dg : dgs) {
@@ -535,7 +535,7 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
         }
 
         if (chop) {
-            draw_text(cont, bounds.width, {cursor_x, cursor_y});
+            draw_text(cont, {cursor_x, cursor_y}, bounds.width);
         }
     }
 

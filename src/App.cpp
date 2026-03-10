@@ -11,6 +11,7 @@
 #include "raylib-cpp.hpp"
 
 #include "ArgVParser.hpp"
+#include "Panel.hpp"
 #include "Screen.hpp"
 
 auto App::run() -> int {
@@ -36,18 +37,50 @@ auto App::run() -> int {
     DisplayNode::line_color = ArgVParser::dark_mode() ? raylib::Color::White() : raylib::Color::Black();
     TextHelper::default_color = ArgVParser::dark_mode() ? raylib::Color::White() : raylib::Color::Black();
     TextHelper::load_fonts();
+    raylib::Image dir_img("./img/icons/directory.png");
+    const auto new_color = ArgVParser::dark_mode() ? raylib::Color::White() : raylib::Color::Black();
+    constexpr auto size = static_cast<int>(TextHelper::font_size);
+    dir_img.ColorReplace(raylib::Color(0x00, 0xFF, 0xFF), new_color);
+    dir_img.Resize(size, size);
+    raylib::Image doc_img("./img/icons/document.png");
+    doc_img.ColorReplace(raylib::Color(0x00, 0xFF, 0xFF), new_color);
+    doc_img.Resize(size, size);
+    FileTreePanel::dir_icon = raylib::Texture2D(dir_img);
+    FileTreePanel::doc_icon = raylib::Texture2D(doc_img);
+    dir_img.Unload();
+    doc_img.Unload();
 
     bool run = true;
 
     State state;
     state.mode = ArgVParser::path ? State::Mode::View : State::Mode::LoadPath;
+    if (state.mode == State::Mode::View) {
+        bool bad_path = false;
+        state.path_type = [&] {
+            if (std::filesystem::is_directory(*ArgVParser::path)) {
+                const auto proj = build_dir_tree(*ArgVParser::path);
+                const auto f = flat_files(proj);
+                return State::PathType::Directory;
+            }
+            if (std::filesystem::is_regular_file(*ArgVParser::path) && ArgVParser::path->extension() == ".rpy") {
+                return State::PathType::File;
+            }
+            bad_path = true;
+            return State::PathType::File;
+        }();
+        if (bad_path) {
+            state.mode = State::Mode::LoadPath;
+        }
+    }
+
     std::unique_ptr<Screen> screen;
+    bool is_dir = state.path_type == State::PathType::Directory;
     switch (state.mode) {
         case State::Mode::LoadPath:
             screen = std::make_unique<LoadScreen>();
             break;
         case State::Mode::View:
-            screen = std::make_unique<ViewScreen>(*ArgVParser::path, window);
+            screen = std::make_unique<ViewScreen>(*ArgVParser::path, window, is_dir);
             break;
         case State::Mode::Exit:
             run = false;
@@ -77,7 +110,7 @@ auto App::run() -> int {
                     screen = std::make_unique<LoadScreen>();
                     break;
                 case State::Mode::View:
-                    screen = std::make_unique<ViewScreen>(*state.path, window);
+                    screen = std::make_unique<ViewScreen>(*state.path, window, is_dir);
                     break;
                 case State::Mode::Exit:
                     run = false;

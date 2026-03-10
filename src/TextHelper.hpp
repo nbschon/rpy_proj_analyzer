@@ -115,9 +115,9 @@ public:
      * https://www.raylib.com/examples/text/loader.html?name=text_inline_styling
      * https://www.raylib.com/examples/text/loader.html?name=text_rectangle_bounds
      */
-    static auto draw_text(std::string_view text, int width, raylib::Vector2 pos, int rel_line = 0.0f) -> int;
+    static auto draw_text(std::string_view text, raylib::Vector2 pos, int width = 0, int rel_line = 0) -> int;
 
-    static auto draw_text_constrained(std::string_view text, raylib::Rectangle bounds, int rel_line = 0.0f, std::string_view cont = "(...)")
+    static auto draw_text_constrained(std::string_view text, raylib::Rectangle bounds, int rel_line = 0, std::string_view cont = "(...)")
         -> std::pair<int, bool>;
 
     // static auto draw_displayable_g_by_g(const Displayable &disp, raylib::Vector2 pos, float max_width = 0.0f) -> std::tuple<float, bool, int>;

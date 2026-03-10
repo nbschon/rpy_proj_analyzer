@@ -23,7 +23,7 @@ void DisplayNode::setup_texture() const {
         tex_box.Draw(raylib::Color(0xE2, 0xE2, 0xE2));
         tex_box.DrawLines(raylib::Color::Black());
 
-        auto offset = TextHelper::draw_text(title, tex_box.width, {title_x, 0});
+        auto offset = TextHelper::draw_text(title, {title_x, 0}, tex_box.width);
 
         if (!fields.empty()) {
             for (const auto &field : fields) {
@@ -143,7 +143,7 @@ auto DisplayNode::draw() const -> std::optional<std::string> {
 
     // DrawTexture(texture.texture, box.x, box.y, raylib::Color::White());
     // DrawTexturePro(texture.texture, {0, 0, width, -height}, box, {0, 0}, 0, raylib::Color::White());
-    auto offset = TextHelper::draw_text(title, static_cast<int>(padding_box.width), title_coords);
+    auto offset = TextHelper::draw_text(title, title_coords, static_cast<int>(padding_box.width));
     if (!fields.empty()) {
         for (const auto &field : fields) {
             const auto [lines, did_chop] = TextHelper::draw_text_constrained(field, padding_box, offset, "...\"");
@@ -169,7 +169,7 @@ auto DisplayNode::draw() const -> std::optional<std::string> {
             {
                 hover_box.Draw(raylib::Color(0xE2, 0xE2, 0xE2));
                 hover_box.DrawLines(raylib::Color::Black());
-                TextHelper::draw_text(text, hover_box.width, {x, y});
+                TextHelper::draw_text(text, {x, y}, hover_box.width);
             }
             // EndTextureMode();
             // return HoverBox(hover_box, std::move(render_texture));

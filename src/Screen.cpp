@@ -14,9 +14,6 @@ LoadScreen::LoadScreen() = default;
 auto LoadScreen::get_dropped_path() -> std::optional<std::filesystem::path> {
     if (IsFileDropped()) {
         const auto dropped = LoadDroppedFiles();
-        // for (int i = 0; i < dropped.count; ++i) {
-        //     std::println("{}", dropped.paths[i]);
-        // }
         auto path = std::filesystem::path(dropped.paths[0]);
         UnloadDroppedFiles(dropped);
         return path;
@@ -54,54 +51,66 @@ void LoadScreen::draw(const raylib::Window &win) {
     const int drag_pls_x = (drop_rect.width / 2.0f) - (drag_pls_w / 2.0f) + 50.0f;
 
     drop_rect.Draw(DisplayNode::default_color);
-    TextHelper::draw_text(no_input, drop_rect.width, {static_cast<float>(no_input_x), drop_rect.y + 50});
-    TextHelper::draw_text(drag_pls, drop_rect.width, {static_cast<float>(drag_pls_x), drop_rect.y + 100});
+    TextHelper::draw_text(no_input, {static_cast<float>(no_input_x), drop_rect.y + 50}, drop_rect.width);
+    TextHelper::draw_text(drag_pls, {static_cast<float>(drag_pls_x), drop_rect.y + 100}, drop_rect.width);
     if (!dropped_path.empty()) {
         const auto dropped_w = TextHelper::text_width(dropped_path);
         const int dropped_x = (drop_rect.width / 2) - (dropped_w / 2) + 50;
-        TextHelper::draw_text(dropped_path, drop_rect.width, {static_cast<float>(dropped_x), drop_rect.y + 200});
+        TextHelper::draw_text(dropped_path, {static_cast<float>(dropped_x), drop_rect.y + 200}, drop_rect.width);
     }
 }
 
-ViewScreen::ViewScreen(const std::filesystem::path &path, const raylib::Window &win) :
-    lexer(path), graph(lexer.tokenize()), graph_layout(graph) {
-    std::tie(display_nodes, line_points) = graph_layout.make_displayables(graph);
+ViewScreen::ViewScreen(const std::filesystem::path &path, const raylib::Window &win, const bool is_dir) {
+    if (is_dir) {
+        camera.target = {0.0f, 0.0f};
+        camera.offset = {0.0f, 0.0f};
+        camera.rotation = 0.0f;
+        camera.zoom = 1.0f;
+        min_x = 0.0f;
+        max_x = 0.0f;
+        min_y = 0.0f;
+        max_y = 0.0f;
+        file_tree = std::make_unique<FileTreePanel>(path);
+    } else {
+        raylib::SetWindowTitle(std::format("rpy_proj_analyzer: {}", path.filename().string()));
+        RenpyFile file(path);
 
-    raylib::SetWindowTitle(std::format("rpy_proj_analyzer: {}", path.filename().string()));
+        std::tie(display_nodes, line_points) = file.layout.make_displayables(file.graph);
 
-    auto dn_min_x = std::numeric_limits<float>::max();
-    auto dn_max_x = -std::numeric_limits<float>::max();
-    auto dn_min_y = std::numeric_limits<float>::max();
-    auto dn_max_y = -std::numeric_limits<float>::max();
+        auto dn_min_x = std::numeric_limits<float>::max();
+        auto dn_max_x = -std::numeric_limits<float>::max();
+        auto dn_min_y = std::numeric_limits<float>::max();
+        auto dn_max_y = -std::numeric_limits<float>::max();
 
-    const auto &first_node = display_nodes.front();
+        const auto &first_node = display_nodes.front();
 
-    for (const auto &dn : display_nodes) {
-        if (dn.padding_box.x < dn_min_x) {
-            dn_min_x = dn.padding_box.x;
-        } else if (dn.padding_box.x > dn_max_x) {
-            dn_max_x = dn.padding_box.x;
+        for (const auto &dn : display_nodes) {
+            if (dn.padding_box.x < dn_min_x) {
+                dn_min_x = dn.padding_box.x;
+            } else if (dn.padding_box.x > dn_max_x) {
+                dn_max_x = dn.padding_box.x;
+            }
+
+            if (dn.padding_box.y < dn_min_y) {
+                dn_min_y = dn.padding_box.y;
+            } else if (dn.padding_box.y > dn_max_y) {
+                dn_max_y = dn.padding_box.y;
+            }
         }
 
-        if (dn.padding_box.y < dn_min_y) {
-            dn_min_y = dn.padding_box.y;
-        } else if (dn.padding_box.y > dn_max_y) {
-            dn_max_y = dn.padding_box.y;
-        }
+        const auto init_x = first_node.padding_box.x + (first_node.padding_box.width / 2) - (static_cast<float>(win.GetWidth()) / 2);
+        camera.target = {init_x, 0.0f};
+        camera.offset = {0.0f, 0.0f};
+        camera.rotation = 0.0f;
+        camera.zoom = 1.0f;
+
+        min_x = 0.0f;
+        max_x = (file.layout.get_max_width() * DisplayNode::get_width()) - 40.0f;
+        // const float min_y = -40.0f;
+        min_y = 0.0f;
+        // const float max_y = display_nodes.back().box.y + display_nodes.back().box.height - 40.0f;
+        max_y = dn_max_y - 40.0f;
     }
-
-    const auto init_x = first_node.padding_box.x + (first_node.padding_box.width / 2) - (static_cast<float>(win.GetWidth()) / 2);
-    camera.target = {init_x, 0.0f};
-    camera.offset = {0.0f, 0.0f};
-    camera.rotation = 0.0f;
-    camera.zoom = 1.0f;
-
-    min_x = 0.0f;
-    max_x = (graph_layout.get_max_width() * DisplayNode::get_width()) - 40.0f;
-    // const float min_y = -40.0f;
-    min_y = 0.0f;
-    // const float max_y = display_nodes.back().box.y + display_nodes.back().box.height - 40.0f;
-    max_y = dn_max_y - 40.0f;
 }
 
 void ViewScreen::update(const raylib::Window &win, State& state) {
@@ -114,15 +123,11 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
         }
     }
 
-    if (App::ctrl_down() && IsKeyPressed(KEY_D)) {
+    if (App::mod_down() && IsKeyPressed(KEY_D)) {
         debug = !debug;
     }
 
-    // if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Q) || win.ShouldClose()) {
-    //     run = false;
-    // }
-
-    if (!App::ctrl_down()) {
+    if (!App::mod_down()) {
         if (IsKeyDown(KEY_S)) {
             camera.target.y += 5;
         } else if (IsKeyDown(KEY_W)) {
@@ -140,14 +145,14 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
         scroll_speed += GetMouseWheelMove();
     } else if (App::shift_down()) {
         camera.target.x -= (GetMouseWheelMoveV().y * scroll_speed);
-    } else if (!App::ctrl_down()) {
+    } else if (!App::mod_down()) {
         camera.target.x -= GetMouseWheelMoveV().x * scroll_speed;
         camera.target.y -= GetMouseWheelMoveV().y * scroll_speed;
     }
 
     const raylib::Vector2 before_zoom = GetScreenToWorld2D(GetMousePosition(), camera);
 
-    if (App::ctrl_down()) {
+    if (App::mod_down()) {
         camera.zoom += GetMouseWheelMove() / 10;
     } else if (IsKeyPressed(KEY_MINUS) || (IsKeyPressed(KEY_KP_SUBTRACT))) {
         camera.zoom -= 0.1f;
@@ -185,6 +190,30 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
 
     for (const auto &dn : on_screen) {
         dn->is_mouse_hovering(camera);
+        if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+            const bool same_clicked = (dn == clicked_ptr);
+            const bool double_click = [&] () -> bool {
+                if (last_clicked) {
+                    if (std::chrono::steady_clock::now() - *last_clicked <= std::chrono::milliseconds(500)) {
+                        return true;
+                    }
+                    return false;
+                }
+                return false;
+            }();
+            const bool collide = dn->main_box.CheckCollision(curr_mouse_pos);
+            if (collide && same_clicked && double_click) {
+                auto now = std::chrono::system_clock::now();
+                std::println("clicked waow {}", now.time_since_epoch());
+            } else if (collide) {
+                last_clicked = std::chrono::steady_clock::now();
+                clicked_ptr = dn;
+            }
+        }
+    }
+
+    if (file_tree) {
+        file_tree->update(win);
     }
 }
 
@@ -221,7 +250,11 @@ void ViewScreen::draw(const raylib::Window &win) {
         const raylib::Rectangle hover_box(x, y, text_width + 2, box_height);
         hover_box.Draw(DisplayNode::default_color);
         hover_box.DrawLines(DisplayNode::line_color);
-        TextHelper::draw_text(hover_text, hover_box.width, {x, y});
+        TextHelper::draw_text(hover_text, {x, y}, hover_box.width);
+    }
+
+    if (file_tree) {
+        file_tree->draw(win);
     }
 
     if (debug) {

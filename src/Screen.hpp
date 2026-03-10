@@ -5,9 +5,11 @@
 #ifndef RPY_PROJ_ANALYZER_SCREEN_HPP
 #define RPY_PROJ_ANALYZER_SCREEN_HPP
 
+#include <chrono>
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <unordered_map>
 
 #include "raylib-cpp.hpp"
 
@@ -15,6 +17,7 @@
 #include "Graph.hpp"
 #include "GraphLayout.hpp"
 #include "Lexer.hpp"
+#include "Panel.hpp"
 
 struct State;
 
@@ -26,7 +29,6 @@ enum class PathType : std::uint8_t {
 class Screen {
 public:
     virtual ~Screen() = default;
-
     virtual void update(const raylib::Window &win, State& state) = 0;
     virtual void draw(const raylib::Window &win) = 0;
 };
@@ -53,9 +55,19 @@ class ViewScreen final : public Screen {
     static constexpr float min_zoom = 0.2f;
     static constexpr float max_zoom = 2.0f;
 
-    Lexer lexer;
-    Graph graph;
-    GraphLayout graph_layout;
+    struct RenpyFile {
+        Lexer lexer;
+        Graph graph;
+        GraphLayout layout;
+
+        explicit RenpyFile(const std::filesystem::path &path)
+            : lexer(path), graph(lexer.tokenize()), layout(graph) {
+        }
+    };
+
+    std::unordered_map<std::string, std::unique_ptr<RenpyFile>> paths;
+    std::string active_file;
+
     std::vector<DisplayNode> display_nodes;
     std::vector<std::array<raylib::Vector2, 5>> line_points;
 
@@ -65,12 +77,17 @@ class ViewScreen final : public Screen {
     float min_y;
     float max_y;
 
+    std::optional<std::chrono::steady_clock::time_point> last_clicked;
+    DisplayNode *clicked_ptr = nullptr;
+
     bool debug = true;
 
     std::vector<DisplayNode*> on_screen;
 
+    std::unique_ptr<FileTreePanel> file_tree = nullptr;
+
 public:
-    explicit ViewScreen(const std::filesystem::path &path, const raylib::Window &win);
+    explicit ViewScreen(const std::filesystem::path &path, const raylib::Window &win, bool is_dir);
     void update(const raylib::Window &win, State& state) override;
     void draw(const raylib::Window &win) override;
 };
