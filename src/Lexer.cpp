@@ -6,12 +6,13 @@
 #include "Node.hpp"
 #include "Token.hpp"
 
-#include <algorithm>
 #include <format>
+#include <fstream>
 #include <list>
 #include <print>
 #include <ranges>
 #include <sstream>
+#include <unordered_set>
 #include <vector>
 
 
@@ -26,6 +27,19 @@ auto Lexer::peek() -> std::optional<char> {
 auto Lexer::consume() -> char {
     col++;
     return input_str.at(offset++);
+}
+
+auto Lexer::identifiers() const -> std::set<std::string> {
+    std::set<std::string> idents;
+
+    for (const auto &tok : this->tokens) {
+        if (std::holds_alternative<TokIdent>(tok)) {
+            auto ident = std::get<TokIdent>(tok);
+            idents.insert(ident.name);
+        }
+    }
+
+    return idents;
 }
 
 void Lexer::parse_num(const bool starts_neg) {
@@ -51,6 +65,102 @@ void Lexer::parse_num(const bool starts_neg) {
     }
 }
 
+void Lexer::remove_empty_lines() {
+    std::vector<Token> cleaned;
+    cleaned.reserve(tokens.size());
+    std::list<Token> tok_buff;
+    bool exc_tabs = true;
+    for (const auto &tok : tokens) {
+        tok_buff.push_back(tok);
+
+        if (std::holds_alternative<TokNewline>(tok)) {
+            if (!exc_tabs && !tok_buff.empty()) {
+                cleaned.insert(cleaned.end(), tok_buff.begin(), tok_buff.end());
+            }
+            tok_buff.clear();
+            exc_tabs = true;
+        } else if (!std::holds_alternative<TokTab>(tok)) {
+            exc_tabs = false;
+        }
+    }
+
+    for (const auto &tok : tok_buff) {
+        if (!std::holds_alternative<TokTab>(tok)) {
+            exc_tabs = false;
+        }
+    }
+
+    if (!tok_buff.empty() && exc_tabs) {
+        cleaned.insert(cleaned.end(), tok_buff.begin(), tok_buff.end());
+    }
+
+    tokens = cleaned;
+}
+
+auto Lexer::get_str_lit(const std::optional<char> init_char) -> std::string {
+    static std::unordered_set<char> escaped = {'\'', '\\', '\"', 'n', 'r', 't', 'b', 'f'};
+    consume();
+    std::string txt_buff;
+
+    while (peek()) {
+        if (const auto curr_char = *peek(); curr_char == '\\') {
+            consume();
+            if (escaped.contains(*peek())) {
+                switch (consume()) {
+                    case '\'':
+                        txt_buff += '\'';
+                        break;
+                    case '\\':
+                        txt_buff += '\\';
+                        break;
+                    case '\"':
+                        txt_buff += '\"';
+                        break;
+                    case 'n':
+                        txt_buff += '\n';
+                        break;
+                    case 'r':
+                        txt_buff += '\r';
+                        break;
+                    case 't':
+                        txt_buff += '\t';
+                        break;
+                    case 'b':
+                        txt_buff += '\b';
+                        break;
+                    case 'f':
+                        txt_buff += '\f';
+                        break;
+                    default:
+                        std::println(std::cerr, "invalid escape sequence at {}:{}", line, col);
+                        break;
+                }
+            }
+        } else if (curr_char == '\"') {
+            break;
+        } else {
+            txt_buff += consume();
+        }
+    }
+    consume();
+    return txt_buff;
+    // const unsigned new_col = col - txt_buff.length() - 2; // 2, one for each quote mark
+    // tokens.emplace_back(TokStrLit{line, new_col, indent_level, txt_buff});
+    // txt_buff.clear();
+
+}
+
+Lexer::Lexer(const std::filesystem::path &path) {
+    const auto input_file = std::ifstream(path);
+    std::stringstream buff;
+    buff << input_file.rdbuf();
+    this->input_str = buff.str();
+
+    if (input_str.empty()) {
+        std::println(std::cerr, "Could not open file: {}", path.string());
+    }
+}
+
 auto Lexer::tokenize() -> std::vector<Token> {
     std::string txt_buff;
     while (peek()) {
@@ -64,6 +174,8 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokShow{line, new_col, indent_level});
             } else if (txt_buff == "hide") {
                 tokens.emplace_back(TokHide{line, new_col, indent_level});
+            } else if (txt_buff == "scene") {
+                tokens.emplace_back(TokScene{line, new_col, indent_level});
             } else if (txt_buff == "menu") {
                 tokens.emplace_back(TokMenu{line, new_col, indent_level});
             } else if (txt_buff == "as") {
@@ -80,8 +192,6 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokWith{line, new_col, indent_level});
             } else if (txt_buff == "label") {
                 tokens.emplace_back(TokLabel{line, new_col, indent_level});
-            } else if (txt_buff == "scene") {
-                tokens.emplace_back(TokScene{line, new_col, indent_level});
             } else if (txt_buff == "True") {
                 tokens.emplace_back(TokBoolLit{line, new_col, indent_level, true});
             } else if (txt_buff == "False") {
@@ -149,13 +259,9 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 consume();
             }
         } else if (*peek() == '\"') {
-            consume();
-            while (peek() && *peek() != '\"') {
-                txt_buff += consume();
-            }
-            consume();
-            const unsigned new_col = col - txt_buff.length() - 2; // 2, one for each quote mark
-            tokens.emplace_back(TokStrLit{line, new_col, indent_level, txt_buff});
+            const auto new_str = get_str_lit();
+            const unsigned new_col = col - new_str.length() - 2; // 2, one for each quote mark
+            tokens.emplace_back(TokStrLit{line, new_col, indent_level, new_str});
             txt_buff.clear();
         } else if (*peek() == '\n') {
             consume();
@@ -255,37 +361,6 @@ auto Lexer::tokenize() -> std::vector<Token> {
     return this->tokens;
 }
 
-void Lexer::remove_empty_lines() {
-    std::vector<Token> cleaned;
-    cleaned.reserve(tokens.size());
-    std::list<Token> tok_buff;
-    bool exc_tabs = true;
-    for (const auto &tok : tokens) {
-        tok_buff.push_back(tok);
-
-        if (std::holds_alternative<TokNewline>(tok)) {
-            if (!exc_tabs && !tok_buff.empty()) {
-                cleaned.insert(cleaned.end(), tok_buff.begin(), tok_buff.end());
-            }
-            tok_buff.clear();
-            exc_tabs = true;
-        } else if (!std::holds_alternative<TokTab>(tok)) {
-            exc_tabs = false;
-        }
-    }
-
-    for (const auto &tok : tok_buff) {
-        if (!std::holds_alternative<TokTab>(tok)) {
-            exc_tabs = false;
-        }
-    }
-
-    if (!tok_buff.empty() && exc_tabs) {
-        cleaned.insert(cleaned.end(), tok_buff.begin(), tok_buff.end());
-    }
-
-    tokens = cleaned;
-}
 
 void Lexer::print_tokens(const unsigned n_lines) const {
     std::vector<unsigned> curr_line;
@@ -327,30 +402,5 @@ void Lexer::print_tokens(const unsigned n_lines) const {
         for (Token const &tok : tokens) {
             print_tok(tok);
         }
-    }
-}
-
-auto Lexer::identifiers() const -> std::set<std::string> {
-    std::set<std::string> idents;
-
-    for (const auto &tok : this->tokens) {
-        if (std::holds_alternative<TokIdent>(tok)) {
-            auto ident = std::get<TokIdent>(tok);
-            idents.insert(ident.name);
-        }
-    }
-
-    return idents;
-}
-
-
-Lexer::Lexer(const std::filesystem::path &path) {
-    this->input_file = std::ifstream(path);
-    std::stringstream buff;
-    buff << input_file.rdbuf();
-    this->input_str = buff.str();
-
-    if (input_str.empty()) {
-        std::println(std::cerr, "Could not open file: {}", path.string());
     }
 }

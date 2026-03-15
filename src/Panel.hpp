@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <format>
 #include <functional>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -91,13 +92,22 @@ inline auto build_dir_tree(const std::filesystem::path &path) -> DirTree {
 class FileTreePanel final : public Panel {
     std::filesystem::path path;
     DirTree tree;
+    struct FileEntry {
+        raylib::Rectangle rect;
+        DirTree* node;
+        int depth;
+        bool open = false;
+    };
+    std::vector<FileEntry> files;
 
 public:
-    static inline raylib::Texture2D doc_icon;
-    static inline raylib::Texture2D dir_icon;
+    static inline std::unique_ptr<raylib::Texture2D> doc_icon;
+    static inline std::unique_ptr<raylib::Texture2D> dir_icon;
     explicit FileTreePanel(const std::filesystem::path &path);
     void update(const raylib::Window &win) override;
     void draw(const raylib::Window &win) override;
+    std::optional<std::filesystem::path> curr_script;
+    static void unload_textures();
 };
 
 

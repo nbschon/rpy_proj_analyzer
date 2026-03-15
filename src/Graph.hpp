@@ -142,6 +142,8 @@ class Graph {
         return nullptr;
     }
 
+    [[nodiscard]] auto add_show_node(const std::vector<Token>& tokens, const Tok& t, bool is_scene = false) -> std::unique_ptr<Node>;
+
     void generate_nodes(const std::vector<Token>& tokens);
 
 public:

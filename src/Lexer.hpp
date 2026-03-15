@@ -9,13 +9,11 @@
 #include "Token.hpp"
 
 #include <filesystem>
-#include <fstream>
 #include <set>
 #include <string>
 #include <vector>
 
 class Lexer {
-    std::ifstream input_file;
     std::string input_str;
     std::vector<Token> tokens;
 
@@ -32,6 +30,7 @@ class Lexer {
 
     void parse_num(bool starts_neg = false);
     void remove_empty_lines();
+    [[nodiscard]] auto get_str_lit(std::optional<char> init_char = std::nullopt) -> std::string;
 
 public:
     explicit Lexer(const std::filesystem::path &path);

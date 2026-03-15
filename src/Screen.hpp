@@ -65,8 +65,7 @@ class ViewScreen final : public Screen {
         }
     };
 
-    std::unordered_map<std::string, std::unique_ptr<RenpyFile>> paths;
-    std::string active_file;
+    std::unordered_map<std::filesystem::path, std::unique_ptr<RenpyFile>> scripts;
 
     std::vector<DisplayNode> display_nodes;
     std::vector<std::array<raylib::Vector2, 5>> line_points;
@@ -85,6 +84,8 @@ class ViewScreen final : public Screen {
     std::vector<DisplayNode*> on_screen;
 
     std::unique_ptr<FileTreePanel> file_tree = nullptr;
+
+    void setup_viewport(const std::filesystem::path &path, const raylib::Window &win);
 
 public:
     explicit ViewScreen(const std::filesystem::path &path, const raylib::Window &win, bool is_dir);

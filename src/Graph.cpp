@@ -109,6 +109,88 @@ auto Graph::assign_scores(const unsigned idx, double curr_score, const OpType op
     return best;
 }
 
+auto Graph::add_show_node(const std::vector<Token>& tokens, const Tok& t, bool is_scene) -> std::unique_ptr<Node> {
+    std::string name;
+    std::vector<std::string> attrs;
+    ShowProps props{};
+
+    if (auto char_name = expect<TokIdent>(tokens)) {
+        name = char_name->name;
+    } else {
+        errors.push_back(std::move(char_name.error()));
+        std::println(std::cerr, "{}", errors.back());
+        return nullptr;
+    }
+
+    while (std::holds_alternative<TokIdent>(tokens.at(idx))) {
+        auto attr = expect<TokIdent>(tokens);
+        // because we're already inside the loop, we already know this is valid
+        attrs.push_back(attr->name);
+    }
+
+    if (const auto as_tok = expect<TokAs>(tokens)) {
+        if (auto as_ident = expect<TokIdent>(tokens)) {
+            props.as = as_ident->name;
+        } else {
+            errors.push_back(std::move(as_ident.error()));
+            std::println(std::cerr, "{}", errors.back());
+            return nullptr;
+        }
+    }
+
+    if (const auto at_tok = expect<TokAt>(tokens)) {
+        if (auto at_pos = expect<TokIdent>(tokens)) {
+            props.at = at_pos->name;
+        } else {
+            errors.push_back(std::move(at_pos.error()));
+            std::println(std::cerr, "{}", errors.back());
+            return nullptr;
+        }
+    }
+
+    if (const auto behind_tok = expect<TokBehind>(tokens)) {
+        if (auto behind_list = expect<TokIdent>(tokens)) {
+            props.behind = behind_list->name;
+        } else {
+            errors.push_back(std::move(behind_list.error()));
+            std::println(std::cerr, "{}", errors.back());
+            return nullptr;
+        }
+    }
+
+    if (const auto onlayer_tok = expect<TokOnlayer>(tokens)) {
+        if (auto layer = expect<TokIdent>(tokens)) {
+            props.onlayer = layer->name;
+        } else {
+            errors.push_back(std::move(layer.error()));
+            std::println(std::cerr, "{}", errors.back());
+            return nullptr;
+        }
+    }
+
+    if (const auto zorder_tok = expect<TokZOrder>(tokens)) {
+        if (auto zorder = expect<TokIntLit>(tokens)) {
+            props.zorder = zorder->value;
+        } else {
+            errors.push_back(std::move(zorder.error()));
+            std::println(std::cerr, "{}", errors.back());
+            return nullptr;
+        }
+    }
+
+    if (const auto with_tok = expect<TokWith>(tokens)) {
+        if (auto trans = expect<TokIdent>(tokens)) {
+            props.trans = trans->name;
+        } else {
+            errors.push_back(std::move(trans.error()));
+            std::println(std::cerr, "{}", errors.back());
+            return nullptr;
+        }
+    }
+
+    return std::make_unique<NodeShow>(t, name, attrs, props, is_scene);
+}
+
 void Graph::generate_nodes(const std::vector<Token>& tokens) {
     idx = 0;
     while (idx < tokens.size()) {
@@ -127,85 +209,15 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokShow& t) {
                     idx++;
-                    std::string name;
-                    std::vector<std::string> attrs;
-                    ShowProps props{};
-
-                    if (auto char_name = expect<TokIdent>(tokens)) {
-                        name = char_name->name;
-                    } else {
-                        errors.push_back(std::move(char_name.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                        return;
+                    if (auto show_node = add_show_node(tokens, t)) {
+                        nodes.push_back(std::move(show_node));
                     }
-
-                    while (std::holds_alternative<TokIdent>(tokens.at(idx))) {
-                        auto attr = expect<TokIdent>(tokens);
-                        // because we're already inside the loop, we already know this is valid
-                        attrs.push_back(attr->name);
+                },
+                [&](const TokScene& t) {
+                    idx++;
+                    if (auto scene_node = add_show_node(tokens, t, true)) {
+                        nodes.push_back(std::move(scene_node));
                     }
-
-                    if (const auto as_tok = expect<TokAs>(tokens)) {
-                        if (auto as_ident = expect<TokIdent>(tokens)) {
-                            props.as = as_ident->name;
-                        } else {
-                            errors.push_back(std::move(as_ident.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    if (const auto at_tok = expect<TokAt>(tokens)) {
-                        if (auto at_pos = expect<TokIdent>(tokens)) {
-                            props.at = at_pos->name;
-                        } else {
-                            errors.push_back(std::move(at_pos.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    if (const auto behind_tok = expect<TokBehind>(tokens)) {
-                        if (auto behind_list = expect<TokIdent>(tokens)) {
-                            props.behind = behind_list->name;
-                        } else {
-                            errors.push_back(std::move(behind_list.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    if (const auto onlayer_tok = expect<TokOnlayer>(tokens)) {
-                        if (const auto layer = expect<TokIdent>(tokens)) {
-                            props.onlayer = layer->name;
-                        } else {
-                            errors.push_back(std::move(layer.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    if (const auto zorder_tok = expect<TokZOrder>(tokens)) {
-                        if (auto zorder = expect<TokIntLit>(tokens)) {
-                            props.zorder = zorder->value;
-                        } else {
-                            errors.push_back(std::move(zorder.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    if (const auto with_tok = expect<TokWith>(tokens)) {
-                        if (auto trans = expect<TokIdent>(tokens)) {
-                            props.trans = trans->name;
-                        } else {
-                            errors.push_back(std::move(trans.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    nodes.emplace_back(std::make_unique<NodeShow>(t, name, attrs, props));
                 },
                 [&](const TokHide& t) {
                     idx++;
@@ -271,12 +283,22 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
 
                     std::unique_ptr<NodeChoice> choice = nullptr;
 
+                    // special case: if the menu has a second line, it's either
+                    // a say statement or a choice.
                     if (const auto str_tok = expect<TokStrLit>(tokens)) {
                         if (auto newline = expect<TokNewline>(tokens);
                             newline && str_tok->indent == t.indent + 1) {
                             text = str_tok->text;
                         } else if (const auto colon = expect<TokColon>(tokens)) {
                             choice = std::make_unique<NodeChoice>(*colon, str_tok->text);
+                        } else if (const auto if_tok = expect<TokIf>(tokens)) {
+                            if (auto slice = expr_slice<TokColon>(tokens)) {
+                                choice = std::make_unique<NodeChoice>(*if_tok, str_tok->text, *slice);
+                            } else {
+                                errors.push_back(std::move(slice.error()));
+                                std::println(std::cerr, "{}", errors.back());
+                                return;
+                            }
                         } else {
                             errors.push_back(std::move(newline.error()));
                             std::println(std::cerr, "{}", errors.back());
@@ -305,16 +327,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     }
                     nodes.push_back(std::make_unique<NodeLabel>(t, ident->name));
                 },
-                [&](const TokScene& t) {
-                    idx++;
-                    if (auto ident = expect<TokIdent>(tokens)) {
-                        nodes.push_back(std::make_unique<NodeScene>(t, ident->name));
-                    } else {
-                        errors.push_back(std::move(ident.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokIdent& t) {
+                [&](const TokIdent &t) {
                     idx++;
                     if (auto str_lit = expect<TokStrLit>(tokens)) {
                         nodes.push_back(std::make_unique<NodeDialogue>(t, t.name, str_lit->text));
@@ -323,11 +336,19 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         std::println(std::cerr, "{}", errors.back());
                     }
                 },
-                [&](const TokStrLit& t) {
+                [&](const TokStrLit &t) {
                     idx++;
                     if (const auto colon = expect<TokColon>(tokens)) {
                         nodes.push_back(std::make_unique<NodeChoice>(t, t.text));
-                    } else if (auto newline = expect<TokNewline>(tokens)) {
+                    } else if (const auto if_tok = expect<TokIf>(tokens)) {
+                        if (auto slice = expr_slice<TokColon>(tokens)) {
+                            nodes.push_back(std::make_unique<NodeChoice>(*if_tok, t.text, *slice));
+                        } else {
+                            errors.push_back(std::move(slice.error()));
+                            std::println(std::cerr, "{}", errors.back());
+                        }
+                    }
+                    else if (auto newline = expect<TokNewline>(tokens)) {
                         nodes.push_back(std::make_unique<NodeDialogue>(t, t.text));
                     } else {
                         errors.push_back(std::move(newline.error()));
@@ -522,7 +543,7 @@ auto Graph::get_roots() -> std::vector<unsigned>& {
 
 void Graph::print_as_graph() {
     visited = std::vector<bool>(nodes.size());
-    const std::function dfs_pre = [&](const unsigned node_idx) -> void {
+    const std::function<void(unsigned)> dfs_pre = [&](const unsigned node_idx) -> void {
         if (node_idx >= nodes.size()) {
             return;
         }

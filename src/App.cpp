@@ -45,8 +45,8 @@ auto App::run() -> int {
     raylib::Image doc_img("./img/icons/document.png");
     doc_img.ColorReplace(raylib::Color(0x00, 0xFF, 0xFF), new_color);
     doc_img.Resize(size, size);
-    FileTreePanel::dir_icon = raylib::Texture2D(dir_img);
-    FileTreePanel::doc_icon = raylib::Texture2D(doc_img);
+    FileTreePanel::dir_icon = std::make_unique<raylib::Texture2D>(dir_img);
+    FileTreePanel::doc_icon = std::make_unique<raylib::Texture2D>(doc_img);
     dir_img.Unload();
     doc_img.Unload();
 
@@ -56,7 +56,7 @@ auto App::run() -> int {
     state.mode = ArgVParser::path ? State::Mode::View : State::Mode::LoadPath;
     if (state.mode == State::Mode::View) {
         bool bad_path = false;
-        state.path_type = [&] {
+        state.path_type = [&] -> State::PathType {
             if (std::filesystem::is_directory(*ArgVParser::path)) {
                 const auto proj = build_dir_tree(*ArgVParser::path);
                 const auto f = flat_files(proj);
@@ -120,6 +120,7 @@ auto App::run() -> int {
     }
 
     TextHelper::unload_fonts();
+    FileTreePanel::unload_textures();
 
     return 0;
 }

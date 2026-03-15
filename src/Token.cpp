@@ -9,68 +9,68 @@
 auto tok_str(const Token& token) -> std::string {
     std::string ret = tok_pos(token);
     std::visit(Overload{
-        [&](const TokDollarSign &t) -> void {
+        [&](const TokDollarSign &) -> void {
             ret += "$";
         },
-        [&](const TokColon &t) -> void {
+        [&](const TokColon &) -> void {
             ret += ":";
         },
-        [&](const TokLParen &t) -> void {
+        [&](const TokLParen &) -> void {
             ret += "(";
         },
-        [&](const TokRParen &t) -> void {
+        [&](const TokRParen &) -> void {
             ret += ")";
         },
-        [&](const TokLCurly &t) -> void {
+        [&](const TokLCurly &) -> void {
             ret += "{";
         },
-        [&](const TokRCurly &t) -> void {
+        [&](const TokRCurly &) -> void {
             ret += "}";
         },
-        [&](const TokLBracket &t) -> void {
+        [&](const TokLBracket &) -> void {
             ret += "[";
         },
-        [&](const TokRBracket &t) -> void {
+        [&](const TokRBracket &) -> void {
             ret += "]";
         },
-        [&](const TokComma &t) -> void {
+        [&](const TokComma &) -> void {
             ret += ",";
         },
-        [&](const TokShow &t) -> void {
+        [&](const TokShow &) -> void {
             ret += "Show";
         },
-        [&](const TokHide &t) -> void {
+        [&](const TokHide &) -> void {
             ret += "Hide";
         },
-        [&](const TokMenu &t) -> void {
+        [&](const TokMenu &) -> void {
             ret += "Menu";
         },
-        [&](const TokChoice &t ) -> void {
+        [&](const TokScene &) -> void {
+            ret += "Scene";
+        },
+        [&](const TokChoice &) -> void {
             ret += "Choice";
         },
-        [&](const TokWith &t) -> void {
+        [&](const TokWith &) -> void {
             ret += "Transition";
         },
-        [&](const TokAs &t) -> void {
+        [&](const TokAs &) -> void {
             ret += "As";
         },
-        [&](const TokAt &t) -> void {
+        [&](const TokAt &) -> void {
             ret += "At";
         },
-        [&](const TokBehind &t) -> void {
+        [&](const TokBehind &) -> void {
             ret += "Behind";
         },
-        [&](const TokOnlayer &t) -> void {
+        [&](const TokOnlayer &) -> void {
             ret += "On Layer";
         },
-        [&](const TokZOrder &t) -> void {
+        [&](const TokZOrder &) -> void {
             ret += "Z Order";
         },
-        [&](const TokLabel &t) -> void {
+        [&](const TokLabel &) -> void {
             ret += "Label";
-        },
-        [&](const TokScene &t) -> void {
-            ret += "Scene";
         },
         [&](const TokIdent &t) -> void {
             ret += std::format("Identifier: {}", t.name);
@@ -90,43 +90,43 @@ auto tok_str(const Token& token) -> std::string {
         [&](const TokOp &t) -> void {
             ret += std::format("Operator: {}", t.type);
         },
-        [&](const TokDefault &t) -> void {
+        [&](const TokDefault &) -> void {
             ret += "Default";
         },
-        [&](const TokDefine &t) -> void {
+        [&](const TokDefine &) -> void {
             ret += "Define";
         },
-        [&](const TokSet &t) -> void {
+        [&](const TokSet &) -> void {
             ret += "Set";
         },
-        [&](const TokPlay &t) -> void {
+        [&](const TokPlay &) -> void {
             ret += "Play";
         },
-        [&](const TokMusic &t) -> void {
+        [&](const TokMusic &) -> void {
             ret += "Music";
         },
-        [&](const TokSfx &t) -> void {
+        [&](const TokSfx &) -> void {
             ret += "SFX";
         },
-        [&](const TokIf &t) -> void {
+        [&](const TokIf &) -> void {
             ret += "If";
         },
-        [&](const TokElif &t) -> void {
+        [&](const TokElif &) -> void {
             ret += "Elif";
         },
-        [&](const TokElse &t) -> void {
+        [&](const TokElse &) -> void {
             ret += "Else";
         },
-        [&](const TokWhile &t) -> void {
+        [&](const TokWhile &) -> void {
             ret += "While";
         },
-        [&](const TokReturn &t) -> void {
+        [&](const TokReturn &) -> void {
             ret += "Return";
         },
-        [&](const TokCall &t) -> void {
+        [&](const TokCall &) -> void {
             ret += "Label call";
         },
-        [&](const TokJump &t) -> void {
+        [&](const TokJump &) -> void {
             ret += "Jump to";
         },
         // [&](const TokCharacter &) -> void {
@@ -135,10 +135,10 @@ auto tok_str(const Token& token) -> std::string {
         [&](const TokImage &) -> void {
             ret += "Image";
         },
-        [&](const TokNewline &t) -> void {
+        [&](const TokNewline &) -> void {
             ret = "\n";
         },
-        [&](const TokTab &t)-> void {
+        [&](const TokTab &)-> void {
             ret = "\t";
         },
         // [&](const TokComma &t) -> void {
@@ -205,6 +205,9 @@ auto tok_color(const Token &token) -> std::uint32_t {
             [&](const TokHide &) -> std::uint32_t {
                 return green;
             },
+            [&](const TokScene &) -> std::uint32_t {
+                return green;
+            },
             [&](const TokMenu &) -> std::uint32_t {
                 return green;
             },
@@ -230,9 +233,6 @@ auto tok_color(const Token &token) -> std::uint32_t {
                 return purple;
             },
             [&](const TokLabel &) -> std::uint32_t {
-                return green;
-            },
-            [&](const TokScene &) -> std::uint32_t {
                 return green;
             },
             [&](const TokIdent &) -> std::uint32_t {

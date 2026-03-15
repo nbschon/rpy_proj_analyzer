@@ -141,8 +141,6 @@ auto DisplayNode::draw() const -> std::optional<std::string> {
         main_box.DrawLines(line_color);
     }
 
-    // DrawTexture(texture.texture, box.x, box.y, raylib::Color::White());
-    // DrawTexturePro(texture.texture, {0, 0, width, -height}, box, {0, 0}, 0, raylib::Color::White());
     auto offset = TextHelper::draw_text(title, title_coords, static_cast<int>(padding_box.width));
     if (!fields.empty()) {
         for (const auto &field : fields) {
@@ -160,19 +158,6 @@ auto DisplayNode::draw() const -> std::optional<std::string> {
             auto [line, col] = underlying->line_and_col();
             auto text = std::format("Line:     {:>4}\nColumn:   {:>4}", line, col);
             return text;
-            const auto text_width = TextHelper::text_width(text);
-            auto x = mouse_pos->x;
-            auto y = mouse_pos->y - box_height;
-            const raylib::Rectangle hover_box(x, y, text_width + 2, box_height);
-            // raylib::RenderTexture2D render_texture(text_width + 2, box_height);
-            // BeginTextureMode(render_texture);
-            {
-                hover_box.Draw(raylib::Color(0xE2, 0xE2, 0xE2));
-                hover_box.DrawLines(raylib::Color::Black());
-                TextHelper::draw_text(text, {x, y}, hover_box.width);
-            }
-            // EndTextureMode();
-            // return HoverBox(hover_box, std::move(render_texture));
         }
     }
 

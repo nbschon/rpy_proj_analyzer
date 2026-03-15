@@ -102,10 +102,10 @@ auto ExprCall::to_string() const -> std::string {
     return std::format("[Callee: {}, {}, {}]", callee_str, arg_str, kwarg_str);
 }
 
-auto break_up_args(std::span<const Token> toks, unsigned& start_idx) -> std::unique_ptr<ExprCall> {
-    if (std::holds_alternative<TokLParen>(toks.front()) && std::holds_alternative<TokRParen>(toks.back())) {
-        std::println("good args!!!");
-    }
+auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx) -> std::unique_ptr<ExprCall> {
+    // if (std::holds_alternative<TokLParen>(toks.front()) && std::holds_alternative<TokRParen>(toks.back())) {
+    //     std::println("good args!!!");
+    // }
     auto idx = start_idx;
     int n_l = 0;
     while (idx < toks.size()) {
@@ -234,7 +234,7 @@ auto fold_into_expr(std::span<const Token> toks, unsigned& idx, const float min_
         }
 
         if (std::holds_alternative<TokLParen>(*peek())) {
-            auto call = break_up_args(toks, idx);
+            auto call = split_inside_parens(toks, idx);
             call->callee = std::move(lhs);
             lhs = std::move(call);
         }

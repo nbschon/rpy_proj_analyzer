@@ -45,8 +45,8 @@ auto NodeParent::has_children() const -> bool {
     return true;
 }
 
-NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> attrs, ShowProps& props)
-    : Node(token), name(std::move(name)), attrs(std::move(attrs)) {
+NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> attrs, ShowProps& props, bool is_scene)
+    : Node(token), name(std::move(name)), attrs(std::move(attrs)), is_scene(is_scene) {
     if (props.as) {
         as = std::move(props.as);
     }
@@ -60,12 +60,12 @@ NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> 
         onlayer = std::move(props.onlayer);
     }
     if (props.zorder) {
-        zorder = std::move(props.zorder);
+        zorder = props.zorder;
     }
 }
 
 auto NodeShow::to_string() const -> std::string {
-    auto ret = std::format("Show: \"{}\"", name);
+    auto ret = is_scene ? std::format("Scene: \"{}\"", name) : std::format("Show: \"{}\"", name);
     // if (attr) {
     //     ret += std::format(" w/ attr \"{}\"", *attr);
     // }
@@ -85,7 +85,6 @@ auto NodeShow::to_string() const -> std::string {
 }
 
 auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Show";
     std::vector<std::string> fields;
     fields.reserve(1 + attrs.size() + at.has_value() + trans.has_value());
     fields.push_back(std::format("Character: {}", name));
@@ -98,7 +97,7 @@ auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     }
     if (at) { fields.push_back(std::format("Position: {}", *at)); }
     if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
-    return {this, rect, "Show", std::move(fields)};
+    return {this, rect, is_scene ? "Scene" : "Show", std::move(fields)};
 }
 
 NodeHide::NodeHide(const Tok& token, std::string name, HideProps &props)
@@ -120,7 +119,6 @@ auto NodeHide::to_string() const -> std::string {
 }
 
 auto NodeHide::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Hide";
     std::vector<std::string> fields;
     fields.reserve(trans.has_value() + 1);
     fields.push_back(std::format("Character: {}", name));
@@ -144,7 +142,6 @@ auto NodeMenu::to_string() const -> std::string {
 }
 
 auto NodeMenu::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Menu";
     std::vector<std::string> fields;
     fields.reserve(text.has_value() + set.has_value());
     if (text) { fields.push_back(std::format("\"{}\"", *text)); }
@@ -156,12 +153,31 @@ NodeChoice::NodeChoice(const Tok& token, std::string text)
     : NodeParent(token), text(std::move(text)) {
 }
 
+NodeChoice::NodeChoice(const Tok& token, std::string text, std::span<const Token> expr_toks)
+    : NodeParent(token), text(std::move(text)),
+    expr_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
+        out += std::format("{:r} ", t);
+        return out;
+    })),
+    display_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
+        out += std::format("{:r} ", t);
+        return out;
+    })) {
+    unsigned idx = 0;
+    clause = fold_into_expr(expr_toks, idx);
+}
+
 auto NodeChoice::to_string() const -> std::string {
     return std::format("Choice: \"{}\"", text);
 }
 
 auto NodeChoice::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Choice";
+    if (clause != nullptr) {
+        return {this, rect, "Choice", {
+            std::format("\"{}\"", text),
+            std::format("Clause: {}", *display_str),
+        }};
+    }
     return {this, rect, "Choice", {std::format("\"{}\"", text)}};
 }
 
@@ -174,22 +190,20 @@ auto NodeLabel::to_string() const -> std::string {
 }
 
 auto NodeLabel::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Label";
     return {this, rect, "Label", {name}};
 }
 
-NodeScene::NodeScene(const Tok& token, std::string name)
-    : Node(token), name(std::move(name)) {
-}
-
-auto NodeScene::to_string() const -> std::string {
-    return std::format("Scene \"{}\"", name);
-}
-
-auto NodeScene::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Scene";
-    return {this, rect, "Scene", {std::format("Name: {}", name)}};
-}
+// NodeScene::NodeScene(const Tok& token, std::string name)
+//     : Node(token), name(std::move(name)) {
+// }
+//
+// auto NodeScene::to_string() const -> std::string {
+//     return std::format("Scene \"{}\"", name);
+// }
+//
+// auto NodeScene::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
+//     return {this, rect, "Scene", {std::format("Name: {}", name)}};
+// }
 
 NodeDialogue::NodeDialogue(const Tok& token, std::string name, std::string text)
     : Node(token), name(std::move(name)), text(std::move(text)) {
@@ -208,7 +222,6 @@ auto NodeDialogue::to_string() const -> std::string {
 }
 
 auto NodeDialogue::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Dialogue";
     std::vector<std::string> fields;
     fields.reserve(name.has_value() + 1); // text is always filled next
     if (name) { fields.push_back(std::format("Character: {}", *name)); }
@@ -222,7 +235,7 @@ NodeExpr::NodeExpr(const Tok& token, const std::span<const Token> expr_toks)
           out += std::format("{:r} ", t);
           return out;
       })),
-      color_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
+      display_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
           out += std::format("{:cr} ", t);
           return out;
       })) {
@@ -241,7 +254,7 @@ NodeExpr::NodeExpr(const Tok& token, std::span<const Token> expr_toks, std::uniq
         out += std::format("{:r} ", t);
         return out;
     })),
-    color_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
+    display_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
         out += std::format("{:cr} ", t);
         return out;
     })) {
@@ -265,7 +278,7 @@ auto NodeExpr::to_string() const -> std::string {
 
 auto NodeExpr::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::string title;
-    std::vector fields = {color_str};
+    std::vector fields = {display_str};
     if (type == DeclareType::Default) {
         title = "Default Init";
     } else if (type == DeclareType::Define) {
@@ -297,7 +310,6 @@ auto NodePlay::to_string() const -> std::string {
 }
 
 auto NodePlay::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // std::string title = "Play";
     std::vector<std::string> fields;
     fields.reserve(2);
     switch (channel) {
@@ -331,7 +343,6 @@ auto NodeIf::to_string() const -> std::string {
 }
 
 auto NodeIf::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "If";
     return {this, rect, "If", {color_str}};
 }
 
@@ -354,7 +365,6 @@ auto NodeElif::to_string() const -> std::string {
 }
 
 auto NodeElif::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Elif";
     std::vector<std::string> fields;
     fields.push_back(color_str);
     return {this, rect, "Elif", std::move(fields)};
@@ -369,7 +379,6 @@ auto NodeElse::to_string() const -> std::string {
 }
 
 auto NodeElse::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Else";
     return DisplayNode(this, rect, "Else");
 }
 
@@ -393,7 +402,6 @@ auto NodeWhile::to_string() const -> std::string {
 }
 
 auto NodeWhile::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "While";
     std::vector<std::string> fields;
     fields.push_back(color_str);
     return {this, rect, "While", std::move(fields)};
@@ -429,7 +437,6 @@ auto NodeReturn::to_string() const -> std::string {
 }
 
 auto NodeReturn::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Return";
     if (expr) {
         std::vector<std::string> fields;
         fields.push_back(color_str);
@@ -447,7 +454,6 @@ auto NodeCall::to_string() const -> std::string {
 }
 
 auto NodeCall::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Call";
     std::vector<std::string> fields;
     fields.push_back(std::format("Label: {}", label));
     return {this, rect, "Call", std::move(fields)};
@@ -462,7 +468,6 @@ auto NodeJump::to_string() const -> std::string {
 }
 
 auto NodeJump::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Jump";
     std::vector<std::string> fields;
     fields.push_back(std::format("Label: {}", label));
     return {this, rect, "Jump", std::move(fields)};
@@ -506,7 +511,6 @@ auto NodeImage::to_string() const -> std::string {
 }
 
 auto NodeImage::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-    // constexpr std::string title = "Image";
     std::vector<std::string> fields;
     fields.reserve(3);
     fields.push_back(std::format("Character: \"{}\"", char_name));

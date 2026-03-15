@@ -30,26 +30,6 @@ enum class DeclareType : std::uint8_t {
     Define,
 };
 
-enum class NodeType : std::uint8_t {
-    Show,
-    Hide,
-    Menu,
-    Choice,
-    Label,
-    Scene,
-    Dialogue,
-    Assign,
-    Play,
-    If,
-    Elif,
-    Else,
-    While,
-    Return,
-    Call,
-    Jump,
-    IfChain,
-};
-
 struct ShowProps {
     std::optional<std::string> as;
     std::optional<std::string> at;
@@ -77,7 +57,7 @@ public:
     unsigned width = 0;
     int score_potential = 0;
 
-    Node(const Tok &tok);
+    explicit Node(const Tok &tok);
     Node(unsigned line, unsigned col, unsigned indent);
 
     virtual ~Node() = default;
@@ -101,7 +81,7 @@ public:
     std::optional<unsigned> first_child;
     std::optional<unsigned> after_block;
 
-    NodeParent(const Tok& tok);
+    explicit NodeParent(const Tok& tok);
     NodeParent(unsigned line, unsigned col, unsigned indent);
 
     [[nodiscard]] auto has_children() const -> bool override;
@@ -116,10 +96,10 @@ class NodeShow final : public Node {
     std::optional<std::string> onlayer;
     std::optional<int> zorder;
     std::optional<std::string> trans;
+    bool is_scene = false;
 
 public:
-    explicit NodeShow(const Tok& token,
-                      std::string name, std::vector<std::string> attrs, ShowProps& props);
+    explicit NodeShow(const Tok& token, std::string name, std::vector<std::string> attrs, ShowProps& props, bool is_scene = false);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 
@@ -142,7 +122,6 @@ public:
 class NodeMenu final : public NodeParent {
     std::optional<std::string> text;
     std::optional<std::string> set;
-    std::vector<unsigned> choices;
 
 public:
     explicit NodeMenu(const Tok& token, const std::optional<std::string>& text, const std::optional<std::string>& set);
@@ -154,9 +133,13 @@ public:
 
 class NodeChoice final : public NodeParent {
     std::string text;
+    std::optional<std::string> expr_str;
+    std::optional<std::string> display_str;
+    std::unique_ptr<Expr> clause = nullptr;
 
 public:
     explicit NodeChoice(const Tok& token, std::string text);
+    NodeChoice(const Tok& token, std::string text, std::span<const Token> expr_toks);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 
@@ -202,13 +185,13 @@ public:
 class NodeExpr final : public Node {
     std::unique_ptr<Expr> expr;
     std::string expr_str;
-    std::string color_str;
+    std::string display_str;
     DeclareType type;
 
 public:
     explicit NodeExpr(const Tok& token, std::span<const Token> expr_toks);
 
-    NodeExpr(const Tok& token, std::span<const Token> expr_toks, std::unique_ptr<Expr> expr, bool ro);
+    NodeExpr(const Tok& token, std::span<const Token> expr_toks, std::unique_ptr<Expr> expr, bool ro); // "ro" i.e. read only
 
     [[nodiscard]] auto to_string() const -> std::string override;
 
@@ -218,7 +201,7 @@ public:
 // class NodeDeclare final : public Node {
 //     std::unique_ptr<Expr> expr;
 //     std::string expr_str;
-//     std::string color_str;
+//     std::string display_str;
 //     bool read_only;
 // };
 

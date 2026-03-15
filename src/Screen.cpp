@@ -8,6 +8,7 @@
 #include <raylib.h>
 
 #include "App.hpp"
+#include "ArgVParser.hpp"
 
 LoadScreen::LoadScreen() = default;
 
@@ -73,9 +74,8 @@ ViewScreen::ViewScreen(const std::filesystem::path &path, const raylib::Window &
         file_tree = std::make_unique<FileTreePanel>(path);
     } else {
         raylib::SetWindowTitle(std::format("rpy_proj_analyzer: {}", path.filename().string()));
-        RenpyFile file(path);
-
-        std::tie(display_nodes, line_points) = file.layout.make_displayables(file.graph);
+        scripts[path] = std::make_unique<RenpyFile>(path);
+        std::tie(display_nodes, line_points) = scripts[path]->layout.make_displayables(scripts[path]->graph);
 
         auto dn_min_x = std::numeric_limits<float>::max();
         auto dn_max_x = -std::numeric_limits<float>::max();
@@ -105,12 +105,53 @@ ViewScreen::ViewScreen(const std::filesystem::path &path, const raylib::Window &
         camera.zoom = 1.0f;
 
         min_x = 0.0f;
-        max_x = (file.layout.get_max_width() * DisplayNode::get_width()) - 40.0f;
+        max_x = (scripts[path]->layout.get_max_width() * DisplayNode::get_width()) - 40.0f;
         // const float min_y = -40.0f;
         min_y = 0.0f;
         // const float max_y = display_nodes.back().box.y + display_nodes.back().box.height - 40.0f;
         max_y = dn_max_y - 40.0f;
     }
+}
+
+void ViewScreen::setup_viewport(const std::filesystem::path &path, const raylib::Window &win) {
+    raylib::SetWindowTitle(std::format("rpy_proj_analyzer: {}", path.filename().string()));
+    const auto &file = scripts.at(path);
+    std::tie(display_nodes, line_points) = file->layout.make_displayables(file->graph);
+
+    auto dn_min_x = std::numeric_limits<float>::max();
+    auto dn_max_x = -std::numeric_limits<float>::max();
+    auto dn_min_y = std::numeric_limits<float>::max();
+    auto dn_max_y = -std::numeric_limits<float>::max();
+
+    const auto &first_node = display_nodes.front();
+
+    for (const auto &dn : display_nodes) {
+        if (dn.padding_box.x < dn_min_x) {
+            dn_min_x = dn.padding_box.x;
+        } else if (dn.padding_box.x > dn_max_x) {
+            dn_max_x = dn.padding_box.x;
+        }
+
+        if (dn.padding_box.y < dn_min_y) {
+            dn_min_y = dn.padding_box.y;
+        } else if (dn.padding_box.y > dn_max_y) {
+            dn_max_y = dn.padding_box.y;
+        }
+    }
+
+    const auto init_x = first_node.padding_box.x + (first_node.padding_box.width / 2) - (static_cast<float>(win.GetWidth()) / 2);
+    camera.target = {init_x, 0.0f};
+    camera.offset = {0.0f, 0.0f};
+    camera.rotation = 0.0f;
+    camera.zoom = 1.0f;
+
+    min_x = 0.0f;
+    max_x = (file->layout.get_max_width() * DisplayNode::get_width()) - 40.0f;
+    // const float min_y = -40.0f;
+    min_y = 0.0f;
+    // const float max_y = display_nodes.back().box.y + display_nodes.back().box.height - 40.0f;
+    max_y = dn_max_y - 40.0f;
+
 }
 
 void ViewScreen::update(const raylib::Window &win, State& state) {
@@ -213,7 +254,12 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
     }
 
     if (file_tree) {
+        const auto prev_script = file_tree->curr_script;
         file_tree->update(win);
+        if (auto cs = file_tree->curr_script; cs != prev_script) {
+            scripts[*cs] = std::make_unique<RenpyFile>(*cs);
+            setup_viewport(*cs, win);
+        }
     }
 }
 
@@ -224,7 +270,7 @@ void ViewScreen::draw(const raylib::Window &win) {
     {
         for (const auto &points : line_points) {
             // DrawSplineBasis(points.data(), 5, 2.0, raylib::Color::Red());
-            DrawLineEx(points.at(1), points.at(3), 2.0, raylib::Color::Red());
+            // DrawLineEx(points.at(1), points.at(3), 2.0, raylib::Color::Red());
         }
 
         for (const auto& dn : on_screen) {
