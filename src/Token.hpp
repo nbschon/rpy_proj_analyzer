@@ -92,6 +92,10 @@ struct TokScene : Tok {
     static constexpr std::string_view type_name = "Scene";
 };
 
+struct TokNone : Tok {
+    static constexpr std::string_view type_name = "None";
+};
+
 struct TokMenu : Tok {
     static constexpr std::string_view type_name = "Menu";
 };
@@ -240,6 +244,7 @@ using Token = std::variant<
     TokShow,
     TokHide,
     TokScene,
+    TokNone,
     TokMenu,
     TokChoice,
     TokAs,
@@ -378,6 +383,9 @@ auto tok_name() -> std::string_view {
             },
             [&](const TokScene &) -> std::string {
                 return "scene";
+            },
+            [&](const TokNone &) -> std::string {
+                return "None";
             },
             [&](const TokMenu &) -> std::string {
                 return "menu";

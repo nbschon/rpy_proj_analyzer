@@ -98,7 +98,7 @@ void Lexer::remove_empty_lines() {
 }
 
 auto Lexer::get_str_lit(const std::optional<char> init_char) -> std::string {
-    static std::unordered_set<char> escaped = {'\'', '\\', '\"', 'n', 'r', 't', 'b', 'f'};
+    static std::unordered_set escaped = {'\'', '\\', '\"', 'n', 'r', 't', 'b', 'f'};
     consume();
     std::string txt_buff;
 
@@ -176,6 +176,8 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokHide{line, new_col, indent_level});
             } else if (txt_buff == "scene") {
                 tokens.emplace_back(TokScene{line, new_col, indent_level});
+            } else if (txt_buff == "None") {
+                tokens.emplace_back(TokNone{line, new_col, indent_level});
             } else if (txt_buff == "menu") {
                 tokens.emplace_back(TokMenu{line, new_col, indent_level});
             } else if (txt_buff == "as") {
@@ -232,8 +234,7 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokJump{line, new_col, indent_level});
             } else if (txt_buff == "image") {
                 tokens.emplace_back(TokImage{line, new_col, indent_level});
-            }
-            else {
+            } else {
                 tokens.emplace_back(TokIdent{line, new_col, indent_level, txt_buff});
             }
             txt_buff.clear();

@@ -48,6 +48,9 @@ auto tok_str(const Token& token) -> std::string {
         [&](const TokScene &) -> void {
             ret += "Scene";
         },
+        [&](const TokNone &) -> void {
+            ret += "None";
+        },
         [&](const TokChoice &) -> void {
             ret += "Choice";
         },
@@ -208,14 +211,17 @@ auto tok_color(const Token &token) -> std::uint32_t {
             [&](const TokScene &) -> std::uint32_t {
                 return green;
             },
+            [&](const TokNone &) -> std::uint32_t {
+                return green;
+            },
+            [&](const TokWith &) -> std::uint32_t {
+                return blue;
+            },
             [&](const TokMenu &) -> std::uint32_t {
                 return green;
             },
             [&](const TokChoice &) -> std::uint32_t {
                 return green;
-            },
-            [&](const TokWith &) -> std::uint32_t {
-                return purple;
             },
             [&](const TokAs &) -> std::uint32_t {
                 return purple;

@@ -178,14 +178,9 @@ auto Graph::add_show_node(const std::vector<Token>& tokens, const Tok& t, bool i
         }
     }
 
-    if (const auto with_tok = expect<TokWith>(tokens)) {
-        if (auto trans = expect<TokIdent>(tokens)) {
-            props.trans = trans->name;
-        } else {
-            errors.push_back(std::move(trans.error()));
-            std::println(std::cerr, "{}", errors.back());
-            return nullptr;
-        }
+    // this is a bit of a hack, should probably be changed in the future
+    if (std::holds_alternative<TokWith>(tokens.at(idx))) {
+        idx--;
     }
 
     return std::make_unique<NodeShow>(t, name, attrs, props, is_scene);
@@ -199,11 +194,11 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
             Overload{
                 [&](const TokDollarSign& t) {
                     idx++;
-                    if (auto expr = expr_slice<TokNewline>(tokens); expr) {
-                        nodes.push_back(std::make_unique<NodeExpr>(t, *expr));
+                    if (auto slice = expr_slice<TokNewline>(tokens); slice) {
+                        nodes.push_back(std::make_unique<NodeExpr>(t, *slice));
                         nodes_w_expr.push_back(nodes.back().get());
                     } else {
-                        errors.push_back(std::move(expr.error()));
+                        errors.push_back(std::move(slice.error()));
                         std::println(std::cerr, "{}", errors.back());
                     }
                 },
@@ -241,17 +236,21 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         }
                     }
 
-                    if (const auto with = expect<TokWith>(tokens)) {
-                        if (auto trans = expect<TokIdent>(tokens)) {
-                            props.trans = trans->name;
-                        } else {
-                            errors.push_back(std::move(trans.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
+                    // same hack as above. should probably be changed.
+                    if (std::holds_alternative<TokWith>(tokens.at(idx))) {
+                        idx--;
                     }
 
                     nodes.emplace_back(std::make_unique<NodeHide>(t, name, props));
+                },
+                [&](const TokWith& t) {
+                    idx++;
+                    if (auto slice = expr_slice<TokNewline>(tokens)) {
+                        nodes.push_back(std::make_unique<NodeWith>(t, *slice));
+                    } else {
+                        errors.push_back(std::move(slice.error()));
+                        std::println(std::cerr, "{}", errors.back());
+                    }
                 },
                 [&](const TokMenu& t) {
                     idx++;
@@ -357,33 +356,33 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokDefault &t) {
                     idx++;
-                    if (auto expr = expr_slice<TokNewline>(tokens)) {
+                    if (auto slice = expr_slice<TokNewline>(tokens)) {
                         unsigned e_idx = 0;
-                        auto new_expr = fold_into_expr(*expr, e_idx);
+                        auto new_expr = fold_into_expr(*slice, e_idx);
                         if (is_valid_assign(new_expr.get())) {
-                            nodes.push_back(std::make_unique<NodeExpr>(t, *expr, std::move(new_expr), false));
+                            nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(new_expr), false));
                             nodes_w_expr.push_back(nodes.back().get());
                         } else {
                             errors.emplace_back(std::format("invalid Default declaration at {}", tok_pos(t)));
                         }
                     } else {
-                        errors.push_back(std::move(expr.error()));
+                        errors.push_back(std::move(slice.error()));
                         std::println(std::cerr, "{}", errors.back());
                     }
                 },
                 [&](const TokDefine &t) {
                     idx++;
-                    if (auto expr = expr_slice<TokNewline>(tokens)) {
+                    if (auto slice = expr_slice<TokNewline>(tokens)) {
                         unsigned e_idx = 0;
-                        auto new_expr = fold_into_expr(*expr, e_idx);
+                        auto new_expr = fold_into_expr(*slice, e_idx);
                         if (is_valid_assign(new_expr.get())) {
-                            nodes.push_back(std::make_unique<NodeExpr>(t, *expr, std::move(new_expr), true));
+                            nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(new_expr), true));
                             nodes_w_expr.push_back(nodes.back().get());
                         } else {
                             errors.emplace_back(std::format("invalid Define declaration at {}", tok_pos(t)));
                         }
                     } else {
-                        errors.push_back(std::move(expr.error()));
+                        errors.push_back(std::move(slice.error()));
                         std::println(std::cerr, "{}", errors.back());
                     }
                 },
@@ -435,15 +434,15 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokReturn& t) {
                     idx++;
-                    if (auto expr = expr_slice<TokNewline>(tokens)) {
-                        if (expr->empty()) {
+                    if (auto slice = expr_slice<TokNewline>(tokens)) {
+                        if (slice->empty()) {
                             nodes.push_back(std::make_unique<NodeReturn>(t));
                         } else {
-                            nodes.push_back(std::make_unique<NodeReturn>(t, *expr));
+                            nodes.push_back(std::make_unique<NodeReturn>(t, *slice));
                         }
                         nodes_w_expr.push_back(nodes.back().get());
                     } else {
-                        errors.push_back(std::move(expr.error()));
+                        errors.push_back(std::move(slice.error()));
                         std::println(std::cerr, "{}", errors.back());
                     }
                 },

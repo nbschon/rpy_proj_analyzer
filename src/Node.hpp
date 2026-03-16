@@ -36,12 +36,12 @@ struct ShowProps {
     std::optional<std::string> behind;
     std::optional<std::string> onlayer;
     std::optional<int> zorder;
-    std::optional<std::string> trans;
+    // std::optional<std::string> trans;
 };
 
 struct HideProps {
     std::optional<std::string> onlayer;
-    std::optional<std::string> trans;
+    // std::optional<std::string> trans;
 };
 
 class Node {
@@ -95,7 +95,7 @@ class NodeShow final : public Node {
     std::optional<std::string> behind;
     std::optional<std::string> onlayer;
     std::optional<int> zorder;
-    std::optional<std::string> trans;
+    // std::optional<std::string> trans;
     bool is_scene = false;
 
 public:
@@ -109,10 +109,23 @@ public:
 class NodeHide final : public Node {
     std::string name;
     std::optional<std::string> onlayer;
-    std::optional<std::string> trans;
+    // std::optional<std::string> trans;
 
 public:
     explicit NodeHide(const Tok& token, std::string name, HideProps& props);
+
+    [[nodiscard]] auto to_string() const -> std::string override;
+
+    [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
+};
+
+class NodeWith final : public Node {
+    std::unique_ptr<Expr> expr;
+    std::string expr_str;
+    std::string display_str;
+
+public:
+    explicit NodeWith(const Tok& token, std::span<const Token> expr_toks);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 

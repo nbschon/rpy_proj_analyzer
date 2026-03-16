@@ -78,15 +78,15 @@ auto NodeShow::to_string() const -> std::string {
     if (at) {
         ret += std::format(" at pos \"{}\"", *at);
     }
-    if (trans) {
-        ret += std::format(" w/ trans. \"{}\"", *trans);
-    }
+    // if (trans) {
+    //     ret += std::format(" w/ trans. \"{}\"", *trans);
+    // }
     return ret;
 }
 
 auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::vector<std::string> fields;
-    fields.reserve(1 + attrs.size() + at.has_value() + trans.has_value());
+    fields.reserve(1 + attrs.size() + at.has_value());
     fields.push_back(std::format("Character: {}", name));
     if (!attrs.empty()) {
         const auto attrs_str = std::ranges::fold_left(attrs, "Attributes: ", [](std::string out, const std::string& s) {
@@ -96,7 +96,7 @@ auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
         fields.push_back(attrs_str);
     }
     if (at) { fields.push_back(std::format("Position: {}", *at)); }
-    if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
+    // if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
     return {this, rect, is_scene ? "Scene" : "Show", std::move(fields)};
 }
 
@@ -105,25 +105,47 @@ NodeHide::NodeHide(const Tok& token, std::string name, HideProps &props)
     if (props.onlayer) {
         onlayer = props.onlayer;
     }
-    if (props.trans) {
-        trans = props.trans;
-    }
+    // if (props.trans) {
+    //     trans = props.trans;
+    // }
 }
 
 auto NodeHide::to_string() const -> std::string {
     auto ret = std::format("Hide: \"{}\"", name);
-    if (trans) {
-        ret += std::format(" w/ trans. \"{}\"", *trans);
-    }
+    // if (trans) {
+    //     ret += std::format(" w/ trans. \"{}\"", *trans);
+    // }
     return ret;
 }
 
 auto NodeHide::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::vector<std::string> fields;
-    fields.reserve(trans.has_value() + 1);
+    fields.reserve(1);
     fields.push_back(std::format("Character: {}", name));
-    if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
+    // if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
     return {this, rect, "Hide", std::move(fields)};
+}
+
+NodeWith::NodeWith(const Tok& token, std::span<const Token> expr_toks)
+    : Node(token),
+    expr_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
+        out += std::format("{:r} ", t);
+        return out;
+    })),
+    display_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
+        out += std::format("{:cr} ", t);
+        return out;
+    })) {
+    unsigned idx = 0;
+    expr = fold_into_expr(expr_toks, idx);
+}
+
+auto NodeWith::to_string() const -> std::string {
+    return std::format("With: {}", expr_str);
+}
+
+auto NodeWith::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
+    return {this, rect, "With", {display_str}};
 }
 
 NodeMenu::NodeMenu(const Tok& token, const std::optional<std::string>& text, const std::optional<std::string>& set)
