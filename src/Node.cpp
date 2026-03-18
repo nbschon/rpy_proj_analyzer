@@ -25,10 +25,6 @@ auto Node::has_children() const -> bool {
     return false;
 }
 
-// auto Node::line_col_str() const -> std::string {
-//     return std::format("({:03d}:{:02d})", line, col);
-// }
-
 auto Node::line_and_col() const -> std::pair<unsigned, unsigned> {
     return {line, col};
 }
@@ -50,8 +46,8 @@ NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> 
     if (props.as) {
         as = std::move(props.as);
     }
-    if (props.at) {
-        at = std::move(props.at);
+    if (!props.transforms.empty()) {
+        transforms = std::move(props.transforms);
     }
     if (props.behind) {
         behind = std::move(props.behind);
@@ -66,55 +62,60 @@ NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> 
 
 auto NodeShow::to_string() const -> std::string {
     auto ret = is_scene ? std::format("Scene: \"{}\"", name) : std::format("Show: \"{}\"", name);
-    // if (attr) {
-    //     ret += std::format(" w/ attr \"{}\"", *attr);
-    // }
     if (!attrs.empty()) {
-        ret += std::ranges::fold_left(attrs, " w/ attrs ", [](std::string out, const std::string& s) {
-            out += std::format("\"{}\", ", s);
+        ret += std::ranges::fold_left(attrs, " w/ attrs", [](std::string out, const std::string& s) {
+            out += std::format(" \"{}\",", s);
             return out;
         });
+        if (ret.ends_with(',')) {
+            ret.pop_back();
+        }
     }
-    if (at) {
-        ret += std::format(" at pos \"{}\"", *at);
+    if (!transforms.empty()) {
+        ret += std::ranges::fold_left(transforms, " w/ transforms", [](std::string out, const std::string& s) {
+            out += std::format(" \"{}\",", s);
+            return out;
+        });
+        if (ret.ends_with(',')) {
+            ret.pop_back();
+        }
     }
-    // if (trans) {
-    //     ret += std::format(" w/ trans. \"{}\"", *trans);
-    // }
     return ret;
 }
 
 auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::vector<std::string> fields;
-    fields.reserve(1 + attrs.size() + at.has_value());
+    fields.reserve(1 + attrs.size() + transforms.size());
     fields.push_back(std::format("Character: {}", name));
     if (!attrs.empty()) {
-        const auto attrs_str = std::ranges::fold_left(attrs, "Attributes: ", [](std::string out, const std::string& s) {
-                out += std::format("\"{}\", ", s);
+        auto attrs_str = std::ranges::fold_left(attrs, "Attributes:", [](std::string out, const std::string& s) {
+                out += std::format(" \"{}\",", s);
                 return out;
             });
+        if (attrs_str.ends_with(',')) {
+            attrs_str.pop_back();
+        }
         fields.push_back(attrs_str);
     }
-    if (at) { fields.push_back(std::format("Position: {}", *at)); }
-    // if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
+    if (!transforms.empty()) {
+        auto tf_str = std::ranges::fold_left(transforms, "Transforms:", [](std::string out, const std::string& s) {
+                out += std::format(" \"{}\",", s);
+                return out;
+            });
+        if (tf_str.ends_with(',')) {
+            tf_str.pop_back();
+        }
+        fields.push_back(tf_str);
+    }
     return {this, rect, is_scene ? "Scene" : "Show", std::move(fields)};
 }
 
-NodeHide::NodeHide(const Tok& token, std::string name, HideProps &props)
-    : Node(token), name(std::move(name)) {
-    if (props.onlayer) {
-        onlayer = props.onlayer;
-    }
-    // if (props.trans) {
-    //     trans = props.trans;
-    // }
+NodeHide::NodeHide(const Tok& token, std::string name, std::optional<std::string> onlayer)
+    : Node(token), name(std::move(name)), onlayer(std::move(onlayer)) {
 }
 
 auto NodeHide::to_string() const -> std::string {
     auto ret = std::format("Hide: \"{}\"", name);
-    // if (trans) {
-    //     ret += std::format(" w/ trans. \"{}\"", *trans);
-    // }
     return ret;
 }
 
@@ -122,7 +123,6 @@ auto NodeHide::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::vector<std::string> fields;
     fields.reserve(1);
     fields.push_back(std::format("Character: {}", name));
-    // if (trans) { fields.push_back(std::format("Transition: {}", *trans)); }
     return {this, rect, "Hide", std::move(fields)};
 }
 
@@ -214,18 +214,6 @@ auto NodeLabel::to_string() const -> std::string {
 auto NodeLabel::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     return {this, rect, "Label", {name}};
 }
-
-// NodeScene::NodeScene(const Tok& token, std::string name)
-//     : Node(token), name(std::move(name)) {
-// }
-//
-// auto NodeScene::to_string() const -> std::string {
-//     return std::format("Scene \"{}\"", name);
-// }
-//
-// auto NodeScene::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-//     return {this, rect, "Scene", {std::format("Name: {}", name)}};
-// }
 
 NodeDialogue::NodeDialogue(const Tok& token, std::string name, std::string text)
     : Node(token), name(std::move(name)), text(std::move(text)) {
@@ -495,35 +483,6 @@ auto NodeJump::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     return {this, rect, "Jump", std::move(fields)};
 }
 
-// NodeCharacter::NodeCharacter(const Tok& token, std::string name, std::string display_name)
-//     : Node(token), name(std::move(name)), display_name(std::move(display_name)), color(std::nullopt) {
-// }
-//
-// NodeCharacter::NodeCharacter(const Tok& token, std::string name, std::string display_name, unsigned color)
-//     : Node(token), name(std::move(name)), display_name(std::move(display_name)), color(color) {
-// }
-//
-// auto NodeCharacter::to_string() const -> std::string {
-//     if (color) {
-//         return std::format(R"(Character "{}", display: "{}", color: {:06X})", name, display_name, *color);
-//     }
-//
-//     return std::format(R"(Character "{}", display: "{}")", name, display_name);
-// }
-//
-// auto NodeCharacter::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-//     // constexpr std::string title = "Character";
-//     std::vector<std::string> fields;
-//     fields.reserve(2);
-//     if (color) {
-//         fields.push_back(std::format("Name: {{color=#{:06X}}}{}{{/color}}", *color, name));
-//     } else {
-//         fields.push_back(std::format("Name: {}", name));
-//     }
-//     fields.push_back(std::format("Display name: {}", display_name));
-//     return {this, rect, "Character", std::move(fields)};
-// }
-
 NodeImage::NodeImage(const Tok& token, std::string char_name, std::vector<std::string> attrs, std::string file_path)
     : Node(token), char_name(std::move(char_name)), attrs(std::move(attrs)), file_path(std::move(file_path)) {
 }
@@ -543,17 +502,3 @@ auto NodeImage::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     fields.push_back(std::format("File path: \"{}\"", file_path));
     return {this, rect, "Image", std::move(fields)};
 }
-
-// NodeIfChain::NodeIfChain(const Tok& token,
-//                          const unsigned if_idx, std::vector<unsigned> elif_idxs, const std::optional<unsigned> else_idx)
-//     : NodeParent(token.line, token.col, token.indent), if_idx(if_idx), elif_idxs(std::move(elif_idxs)), else_idx(else_idx) {
-// }
-//
-// auto NodeIfChain::to_string() const -> std::string {
-//     return "=== If Chain ===";
-// }
-//
-// auto NodeIfChain::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
-//     const auto title = "If Chain";
-//     return DisplayNode(this, rect, title);
-// }

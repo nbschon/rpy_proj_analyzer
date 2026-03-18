@@ -32,11 +32,10 @@ enum class DeclareType : std::uint8_t {
 
 struct ShowProps {
     std::optional<std::string> as;
-    std::optional<std::string> at;
+    std::vector<std::string> transforms;
     std::optional<std::string> behind;
     std::optional<std::string> onlayer;
     std::optional<int> zorder;
-    // std::optional<std::string> trans;
 };
 
 struct HideProps {
@@ -91,7 +90,7 @@ class NodeShow final : public Node {
     std::string name;
     std::vector<std::string> attrs;
     std::optional<std::string> as;
-    std::optional<std::string> at;
+    std::vector<std::string> transforms;
     std::optional<std::string> behind;
     std::optional<std::string> onlayer;
     std::optional<int> zorder;
@@ -109,10 +108,9 @@ public:
 class NodeHide final : public Node {
     std::string name;
     std::optional<std::string> onlayer;
-    // std::optional<std::string> trans;
 
 public:
-    explicit NodeHide(const Tok& token, std::string name, HideProps& props);
+    explicit NodeHide(const Tok& token, std::string name, std::optional<std::string> onlayer);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 
@@ -211,13 +209,6 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
-// class NodeDeclare final : public Node {
-//     std::unique_ptr<Expr> expr;
-//     std::string expr_str;
-//     std::string display_str;
-//     bool read_only;
-// };
-
 class NodePlay final : public Node {
     AudioChannel channel;
     std::string path;
@@ -315,20 +306,6 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
-// class NodeCharacter final : public Node {
-//     std::string name;
-//     std::string display_name;
-//     std::optional<unsigned> color;
-//
-// public:
-//     explicit NodeCharacter(const Tok& token, std::string name, std::string display_name);
-//     NodeCharacter(const Tok& token, std::string name, std::string display_name, unsigned color);
-//
-//     [[nodiscard]] auto to_string() const -> std::string override;
-//
-//     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
-// };
-
 class NodeImage final : public Node {
     std::string char_name;
     std::vector<std::string> attrs;
@@ -342,31 +319,9 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
-// class NodeIfChain final : public NodeParent {
-//     unsigned if_idx;
-//     std::vector<unsigned> elif_idxs;
-//     std::optional<unsigned> else_idx;
-//
-// public:
-//     explicit NodeIfChain(const Tok& token,
-//                          unsigned if_idx, std::vector<unsigned> elif_idxs, std::optional<unsigned> else_idx);
-//
-//     [[nodiscard]] auto to_string() const -> std::string override;
-//
-//     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
-//
-//     [[nodiscard]] auto get_if_idx() const -> unsigned {
-//         return if_idx;
-//     }
-//
-//     [[nodiscard]] auto get_elif_idxs() const -> std::vector<unsigned> {
-//         return elif_idxs;
-//     }
-//
-//     [[nodiscard]] auto get_else_idx() const -> std::optional<unsigned> {
-//         return else_idx;
-//     }
-// };
+class NodeTransform final : public NodeParent {
+    std::string name;
+};
 
 template<>
 struct std::formatter<Node> {

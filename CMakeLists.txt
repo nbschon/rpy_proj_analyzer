@@ -52,6 +52,8 @@ add_executable(rpy_proj_analyzer
         src/Screen.hpp
         src/Panel.cpp
         src/Panel.hpp
+        src/ATL.cpp
+        src/ATL.hpp
 )
 
 target_include_directories(rpy_proj_analyzer PRIVATE ${CMAKE_SOURCE_DIR}/include)

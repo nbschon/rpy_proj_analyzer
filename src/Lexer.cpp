@@ -97,7 +97,7 @@ void Lexer::remove_empty_lines() {
     tokens = cleaned;
 }
 
-auto Lexer::get_str_lit(const std::optional<char> init_char) -> std::string {
+auto Lexer::get_str_lit() -> std::string {
     static std::unordered_set escaped = {'\'', '\\', '\"', 'n', 'r', 't', 'b', 'f'};
     consume();
     std::string txt_buff;
@@ -144,10 +144,6 @@ auto Lexer::get_str_lit(const std::optional<char> init_char) -> std::string {
     }
     consume();
     return txt_buff;
-    // const unsigned new_col = col - txt_buff.length() - 2; // 2, one for each quote mark
-    // tokens.emplace_back(TokStrLit{line, new_col, indent_level, txt_buff});
-    // txt_buff.clear();
-
 }
 
 Lexer::Lexer(const std::filesystem::path &path) {
@@ -162,6 +158,24 @@ Lexer::Lexer(const std::filesystem::path &path) {
 }
 
 auto Lexer::tokenize() -> std::vector<Token> {
+    static std::unordered_set<std::string> atl_tf_props = {
+        "property",
+        "pause",
+        "warp",
+        "knot",
+        "clockwise",
+        "counterclockwise",
+        "circles",
+        "repeat",
+        "block",
+        "parallel",
+        "animation",
+        "on",
+        "contains",
+        "function",
+        "time",
+        "event",
+    };
     std::string txt_buff;
     while (peek()) {
         if (std::isalpha(*peek()) != 0) {
@@ -234,6 +248,40 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokJump{line, new_col, indent_level});
             } else if (txt_buff == "image") {
                 tokens.emplace_back(TokImage{line, new_col, indent_level});
+            } else if (txt_buff == "transform") {
+                tokens.emplace_back(TokTransform{line, new_col, indent_level});
+            } else if (txt_buff == "pause") {
+                tokens.emplace_back(TokATLPause{line, new_col, indent_level});
+            } else if (txt_buff == "warp") {
+                tokens.emplace_back(TokATLWarp{line, new_col, indent_level});
+            } else if (txt_buff == "knot") {
+                tokens.emplace_back(TokATLKnot{line, new_col, indent_level});
+            } else if (txt_buff == "clockwise") {
+                tokens.emplace_back(TokATLClockwise{line, new_col, indent_level});
+            } else if (txt_buff == "counterclockwise") {
+                tokens.emplace_back(TokATLCCWise{line, new_col, indent_level});
+            } else if (txt_buff == "circles") {
+                tokens.emplace_back(TokATLCircles{line, new_col, indent_level});
+            } else if (txt_buff == "repeat") {
+                tokens.emplace_back(TokATLRepeat{line, new_col, indent_level});
+            } else if (txt_buff == "block") {
+                tokens.emplace_back(TokATLBlock{line, new_col, indent_level});
+            } else if (txt_buff == "parallel") {
+                tokens.emplace_back(TokATLParallel{line, new_col, indent_level});
+            } else if (txt_buff == "animation") {
+                tokens.emplace_back(TokATLAnimation{line, new_col, indent_level});
+            } else if (txt_buff == "on") {
+                tokens.emplace_back(TokATLOn{line, new_col, indent_level});
+            } else if (txt_buff == "contains") {
+                tokens.emplace_back(TokATLContains{line, new_col, indent_level});
+            } else if (txt_buff == "function") {
+                tokens.emplace_back(TokATLFunction{line, new_col, indent_level});
+            } else if (txt_buff == "time") {
+                tokens.emplace_back(TokATLTime{line, new_col, indent_level});
+            } else if (txt_buff == "event") {
+                tokens.emplace_back(TokATLEvent{line, new_col, indent_level});
+            } else if (atl_tf_props.contains(txt_buff)) {
+                tokens.emplace_back(TokATLProperty{line, new_col, indent_level, prop_from_str(txt_buff)});
             } else {
                 tokens.emplace_back(TokIdent{line, new_col, indent_level, txt_buff});
             }

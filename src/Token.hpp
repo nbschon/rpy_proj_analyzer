@@ -37,6 +37,73 @@ enum class OpType : std::uint8_t {
     RParen,
 };
 
+/*
+ * Transformation property information borrowed from here:
+ * https://www.renpy.org/doc/html/transform_properties.html
+ */
+enum class TFPropType : std::uint8_t {
+    /* Name of property    Params */
+    // Positioning
+    Pos,                // (pos, pos)
+    XPos,               // pos
+    YPos,               // pos
+    Anchor,             // (pos, pos)
+    XAnchor,            // pos
+    YAnchor,            // pos
+    Align,              // (float, float)
+    XAlign,             // float
+    YAlign,             // float
+    Offset,             // (abs, abs)
+    XOffset,            // abs
+    YOffset,            // abs
+    XYCenter,           // (pos, pos)
+    XCenter,            // pos
+    YCenter,            // pos
+    SubPixel,           // bool
+    // Rotation
+    Rotate,             // float | None
+    Rotate_Pad,         // bool
+    TF_Anchor,          // bool
+    // Zoom & Flip
+    Zoom,               // float
+    XZoom,              // float
+    YZoom,              // float
+    // Pixel Effects
+    Nearest,            // bool
+    Alpha,              // float
+    Additive,           // float
+    MatrixColor,        // None | Matrix | MatrixColor
+    Blur,               // float | None
+    // Polar Positioning
+    Around,             // (pos, pos)
+    Angle,              // float
+    Radius,             // pos
+    // Polar Positioning of Anchor
+    AnchorAround,       // (pos, pos)
+    AnchorAngle,        // (float)
+    AnchorRadius,       // (pos)
+    // Crop & Resize
+    Crop,               // None | (pos, pos, pos, pos)
+    Corner1,            // None | (pos, pos)
+    Corner2,            // None | (pos, pos)
+    XYSize,             // None | (pos, pos)
+    XSize,              // None | pos
+    YSize,              // None | pos
+    Fit,                // None | str
+    // Pan & Tile
+    XPan,               // None | float
+    YPan,               // None | float
+    XTile,              // int
+    YTile,              // int
+    // Transitions
+    Delay,              // bool
+    Events,             // float
+    // Other
+    FPS,                // None | float
+    Show_Cancels_Hide,  // bool
+    // not adding deprecated TF properties...
+};
+
 struct Tok {
     unsigned line;
     unsigned col;
@@ -207,6 +274,10 @@ struct TokReturn : Tok {
     static constexpr std::string_view type_name = "Return";
 };
 
+struct TokPass : Tok {
+    static constexpr std::string_view type_name = "Pass";
+};
+
 struct TokCall : Tok {
     static constexpr std::string_view type_name = "Call";
 };
@@ -222,6 +293,77 @@ struct TokCharacter : Tok {
 struct TokImage : Tok {
     static constexpr std::string_view type_name = "Image";
 };
+
+// ATL tokens start here:
+struct TokTransform : Tok {
+    static constexpr std::string_view type_name = "Transform";
+};
+
+struct TokATLProperty : Tok {
+    static constexpr std::string_view type_name = "ATLProperty";
+    TFPropType type;
+};
+
+struct TokATLPause : Tok {
+    static constexpr std::string_view type_name = "ATLPause";
+};
+
+struct TokATLWarp : Tok {
+    static constexpr std::string_view type_name = "ATLWarp";
+};
+
+struct TokATLKnot : Tok {
+    static constexpr std::string_view type_name = "ATLKnot";
+};
+
+struct TokATLClockwise : Tok {
+    static constexpr std::string_view type_name = "ATLClockwise";
+};
+
+struct TokATLCCWise : Tok {
+    static constexpr std::string_view type_name = "ATLCCWise";
+};
+
+struct TokATLCircles : Tok {
+    static constexpr std::string_view type_name = "ATLCircles";
+};
+
+struct TokATLRepeat : Tok {
+    static constexpr std::string_view type_name = "ATLRepeat";
+};
+
+struct TokATLBlock : Tok {
+    static constexpr std::string_view type_name = "ATLBlock";
+};
+
+struct TokATLParallel : Tok {
+    static constexpr std::string_view type_name = "ATLParallel";
+};
+
+struct TokATLAnimation : Tok {
+    static constexpr std::string_view type_name = "ATLAnimation";
+};
+
+struct TokATLOn : Tok {
+    static constexpr std::string_view type_name = "ATLOn";
+};
+
+struct TokATLContains : Tok {
+    static constexpr std::string_view type_name = "ATLContains";
+};
+
+struct TokATLFunction : Tok {
+    static constexpr std::string_view type_name = "ATLFunction";
+};
+
+struct TokATLTime : Tok {
+    static constexpr std::string_view type_name = "ATLTime";
+};
+
+struct TokATLEvent : Tok {
+    static constexpr std::string_view type_name = "ATLEvent";
+};
+// ATL tokens end here.
 
 struct TokNewline : Tok {
     static constexpr std::string_view type_name = "Newline";
@@ -271,10 +413,27 @@ using Token = std::variant<
     TokElse,
     TokWhile,
     TokReturn,
+    TokPass,
     TokCall,
     TokJump,
-    // TokCharacter,
     TokImage,
+    TokTransform,
+    TokATLProperty,
+    TokATLPause,
+    TokATLWarp,
+    TokATLKnot,
+    TokATLClockwise,
+    TokATLCCWise,
+    TokATLCircles,
+    TokATLRepeat,
+    TokATLBlock,
+    TokATLParallel,
+    TokATLAnimation,
+    TokATLOn,
+    TokATLContains,
+    TokATLFunction,
+    TokATLTime,
+    TokATLEvent,
     TokNewline,
     TokTab>;
 
@@ -328,6 +487,110 @@ inline auto op_str(const OpType &type) -> std::string {
             return ")";
         default:
             std::println(std::cerr, "Invalid operator in token");
+            std::unreachable();
+    }
+}
+
+inline auto prop_str(const TFPropType &type) -> std::string {
+    switch (type) {
+        case TFPropType::Pos:
+            return "pos";
+        case TFPropType::XPos:
+            return "xpos";
+        case TFPropType::YPos:
+            return "ypos";
+        case TFPropType::Anchor:
+            return "anchor";
+        case TFPropType::XAnchor:
+            return "xanchor";
+        case TFPropType::YAnchor:
+            return "yanchor";
+        case TFPropType::Align:
+            return "align";
+        case TFPropType::XAlign:
+            return "xalign";
+        case TFPropType::YAlign:
+            return "yalign";
+        case TFPropType::Offset:
+            return "offset";
+        case TFPropType::XOffset:
+            return "xoffset";
+        case TFPropType::YOffset:
+            return "yoffset";
+        case TFPropType::XYCenter:
+            return "xycenter";
+        case TFPropType::XCenter:
+            return "xcenter";
+        case TFPropType::YCenter:
+            return "ycenter";
+        case TFPropType::SubPixel:
+            return "subpixel";
+        case TFPropType::Rotate:
+            return "rotate";
+        case TFPropType::Rotate_Pad:
+            return "rotate_pad";
+        case TFPropType::TF_Anchor:
+            return "transform_anchor";
+        case TFPropType::Zoom:
+            return "zoom";
+        case TFPropType::XZoom:
+            return "xzoom";
+        case TFPropType::YZoom:
+            return "yzoom";
+        case TFPropType::Nearest:
+            return "nearest";
+        case TFPropType::Alpha:
+            return "alpha";
+        case TFPropType::Additive:
+            return "additive";
+        case TFPropType::MatrixColor:
+            return "matrixcolor";
+        case TFPropType::Blur:
+            return "blur";
+        case TFPropType::Around:
+            return "around";
+        case TFPropType::Angle:
+            return "angle";
+        case TFPropType::Radius:
+            return "radius";
+        case TFPropType::AnchorAround:
+            return "anchoraround";
+        case TFPropType::AnchorAngle:
+            return "anchorangle";
+        case TFPropType::AnchorRadius:
+            return "anchorradius";
+        case TFPropType::Crop:
+            return "crop";
+        case TFPropType::Corner1:
+            return "corner1";
+        case TFPropType::Corner2:
+            return "corner2";
+        case TFPropType::XYSize:
+            return "xysize";
+        case TFPropType::XSize:
+            return "xsize";
+        case TFPropType::YSize:
+            return "ysize";
+        case TFPropType::Fit:
+            return "fit";
+        case TFPropType::XPan:
+            return "xpan";
+        case TFPropType::YPan:
+            return "ypan";
+        case TFPropType::XTile:
+            return "xtile";
+        case TFPropType::YTile:
+            return "ytile";
+        case TFPropType::Delay:
+            return "delay";
+        case TFPropType::Events:
+            return "events";
+        case TFPropType::FPS:
+            return "fps";
+        case TFPropType::Show_Cancels_Hide:
+            return "show_cancels_hide";
+        default:
+            std::println(std::cerr, "Invalid property in transformation");
             std::unreachable();
     }
 }
@@ -465,17 +728,68 @@ auto tok_name() -> std::string_view {
             [&](const TokReturn &) -> std::string {
                 return "return";
             },
+            [&](const TokPass &) -> std::string {
+                return "pass";
+            },
             [&](const TokCall &) -> std::string {
                 return "call";
             },
             [&](const TokJump &) -> std::string {
                 return "jump";
             },
-            // [&](const TokCharacter &) -> std::string {
-            //     return "Character";
-            // },
             [&](const TokImage &) -> std::string {
                 return "image";
+            },
+            [&](const TokTransform &) -> std::string {
+                return "transform";
+            },
+            [&](const TokATLProperty &t) -> std::string {
+                return prop_str((t.type));
+            },
+            [&](const TokATLPause &) -> std::string {
+                return "pause";
+            },
+            [&](const TokATLWarp &) -> std::string {
+                return "warp";
+            },
+            [&](const TokATLKnot &) -> std::string {
+                return "knot";
+            },
+            [&](const TokATLClockwise &) -> std::string {
+                return "clockwise";
+            },
+            [&](const TokATLCCWise &) -> std::string {
+                return "counterclockwise";
+            },
+            [&](const TokATLCircles &) -> std::string {
+                return "circles";
+            },
+            [&](const TokATLRepeat &) -> std::string {
+                return "repeat";
+            },
+            [&](const TokATLBlock &) -> std::string {
+                return "block";
+            },
+            [&](const TokATLParallel &) -> std::string {
+                return "parallel";
+            },
+            [&](const TokATLAnimation &) -> std::string {
+                return "animation";
+            },
+            [&](const TokATLOn &) -> std::string {
+                return "on";
+            },
+            [&](const TokATLContains &) -> std::string {\
+                return "contains";
+            },
+            [&](const TokATLFunction &) -> std::string {
+                return "function";
+            },
+            [&](const TokATLTime &) -> std::string {
+                return "time";
+            },
+            [&](const TokATLEvent &) -> std::string {
+                return "event";
             },
             [&](const TokNewline &) -> std::string {
                 return "\n";
@@ -490,6 +804,7 @@ auto tok_str(const Token &token) -> std::string;
 auto tok_pos(const Token &token) -> std::string;
 auto tok_pos(const Tok &token) -> std::string;
 auto tok_color(const Token &token) -> std::uint32_t;
+auto prop_from_str(const std::string_view &str) -> TFPropType;
 
 auto operator<<(std::ostream &stream, const Token &token) -> std::ostream &;
 

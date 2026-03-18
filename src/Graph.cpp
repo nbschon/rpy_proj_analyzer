@@ -139,10 +139,19 @@ auto Graph::add_show_node(const std::vector<Token>& tokens, const Tok& t, bool i
     }
 
     if (const auto at_tok = expect<TokAt>(tokens)) {
-        if (auto at_pos = expect<TokIdent>(tokens)) {
-            props.at = at_pos->name;
+        if (auto tf_tok = expect<TokIdent>(tokens)) {
+            props.transforms.push_back(tf_tok->name);
+            while (auto comma_tok = expect<TokComma>(tokens)) {
+                if (const auto next_tf = expect<TokIdent>(tokens)) {
+                    props.transforms.push_back(next_tf->name);
+                } else {
+                    errors.push_back(std::move(next_tf.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return nullptr;
+                }
+            }
         } else {
-            errors.push_back(std::move(at_pos.error()));
+            errors.push_back(std::move(tf_tok.error()));
             std::println(std::cerr, "{}", errors.back());
             return nullptr;
         }
@@ -217,7 +226,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 [&](const TokHide& t) {
                     idx++;
                     std::string name;
-                    HideProps props{};
+                    std::optional<std::string> onlayer;
                     if (auto char_name = expect<TokIdent>(tokens)) {
                         name = char_name->name;
                     } else {
@@ -228,7 +237,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
 
                     if (const auto onlayer_tok = expect<TokOnlayer>(tokens)) {
                         if (auto layer = expect<TokIdent>(tokens)) {
-                            props.onlayer = layer->name;
+                            onlayer = layer->name;
                         } else {
                             errors.push_back(std::move(layer.error()));
                             std::println(std::cerr, "{}", errors.back()) ;
@@ -241,7 +250,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                         idx--;
                     }
 
-                    nodes.emplace_back(std::make_unique<NodeHide>(t, name, props));
+                    nodes.emplace_back(std::make_unique<NodeHide>(t, name, onlayer));
                 },
                 [&](const TokWith& t) {
                     idx++;

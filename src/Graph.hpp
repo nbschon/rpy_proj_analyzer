@@ -111,7 +111,7 @@ class Graph {
                     },
                     [&](const TokNone) -> void {
                         idx++;
-                    }
+                    },
                     [&]<typename U>(U&& other) -> void {
                         using V = std::decay_t<U>;
                         static_assert(std::is_base_of_v<Tok, V>, "expected derived from base Tok");
