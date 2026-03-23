@@ -86,7 +86,11 @@ auto NodeShow::to_string() const -> std::string {
 auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::vector<std::string> fields;
     fields.reserve(1 + attrs.size() + transforms.size());
-    fields.push_back(std::format("Character: {}", name));
+    if (is_scene) {
+        fields.push_back(std::format("Image: {}", name));
+    } else {
+        fields.push_back(std::format("Character: {}", name));
+    }
     if (!attrs.empty()) {
         auto attrs_str = std::ranges::fold_left(attrs, "Attributes:", [](std::string out, const std::string& s) {
                 out += std::format(" \"{}\",", s);

@@ -33,6 +33,7 @@ class Graph {
     std::vector<bool> visited;
     std::vector<std::string> errors;
     std::vector<Node*> nodes_w_expr;
+    std::vector<Token> tokens;
 
     unsigned idx = 0;
 
@@ -56,7 +57,7 @@ class Graph {
 
     template<typename T>
     requires InTokens<T>
-    [[nodiscard]] auto expect(const std::vector<Token>& tokens) -> std::expected<T, std::string> {
+    [[nodiscard]] auto expect() -> std::expected<T, std::string> {
         auto const& tok = tokens.at(idx);
         if (std::holds_alternative<T>(tok)) {
             return std::get<T>(tokens.at(idx++));
@@ -75,7 +76,7 @@ class Graph {
      */
     template<typename... Ts>
     requires (InTokens<Ts> && ...)
-    [[nodiscard]] auto multi_tok_error(const std::vector<Token> &tokens, const std::vector<std::string_view> &other = {}) -> std::string {
+    [[nodiscard]] auto multi_tok_error(const std::vector<std::string_view> &other = {}) -> std::string {
         std::vector<std::string_view> things;
         ((things.push_back(tok_name<Ts>())), ...);
 
@@ -114,7 +115,7 @@ class Graph {
     // it's a colon instead.
     template<typename T>
     requires InTokens<T>
-    [[nodiscard]] auto expr_slice(const std::vector<Token>& tokens) -> std::expected<std::span<const Token>, std::string> {
+    [[nodiscard]] auto expr_slice() -> std::expected<std::span<const Token>, std::string> {
         std::string error_msg;
 
         const std::size_t start_idx = idx;
@@ -173,11 +174,11 @@ class Graph {
     }
 
     template<typename T>
-    [[nodiscard]] auto add_cond_node(const std::vector<Token>& tokens, const Tok& t)
+    [[nodiscard]] auto add_cond_node(const Tok& t)
         -> std::unique_ptr<Node> {
         idx++;
 
-        const auto expr = expr_slice<TokColon>(tokens);
+        const auto expr = expr_slice<TokColon>();
         if (expr) {
             return std::make_unique<T>(t, *expr);
         }
@@ -186,12 +187,13 @@ class Graph {
         return nullptr;
     }
 
-    [[nodiscard]] auto add_show_node(const std::vector<Token>& tokens, const Tok& t, bool is_scene = false) -> std::unique_ptr<Node>;
+    [[nodiscard]] auto add_show_node(const Tok& t, bool is_scene = false) -> std::unique_ptr<Node>;
 
-    void generate_nodes(const std::vector<Token>& tokens);
+
+    void generate_nodes();
 
 public:
-    explicit Graph(const std::vector<Token>& tokens);
+    explicit Graph(std::vector<Token> tokens);
 
     auto get_nodes() -> std::vector<std::unique_ptr<Node>>&;
 
