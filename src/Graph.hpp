@@ -68,6 +68,47 @@ class Graph {
         return std::unexpected(std::format("expected {}, got {}", tok_name<T>(), actual));
     }
 
+    /**
+     * @brief returns a string containing the potential expected tokens, and the actual one.
+     *
+     * @tparam Ts all potential types that should've been encountered instead.
+     */
+    template<typename... Ts>
+    requires (InTokens<Ts> && ...)
+    [[nodiscard]] auto multi_tok_error(const std::vector<Token> &tokens, const std::vector<std::string_view> &other = {}) -> std::string {
+        std::vector<std::string_view> things;
+        ((things.push_back(tok_name<Ts>())), ...);
+
+        if (!other.empty()) {
+            for (const auto &o : other) {
+                things.push_back(o);
+            }
+        }
+
+        auto const &tok = tokens.at(idx);
+        const std::string actual = std::visit([]<typename V>(V const &t) -> std::string {
+            return std::format("{} at {}", tok_name<std::decay_t<V>>(), tok_pos(t));
+        }, tok);
+
+        std::string expected;
+        switch (things.size()) {
+            case 1:
+                expected = things.at(0);
+                break;
+            case 2:
+                expected = std::format("{} or {}", things.at(0), things.at(1));
+                break;
+            default:
+                for (int i = 0; i < things.size() - 1; i++) {
+                    expected += std::format("{}, ", things.at(i));
+                }
+                expected += std::format("or {}", things.back());
+                break;
+        }
+
+        return std::format("expected {}, got {}", expected, actual);
+    }
+
     // the template argument is the token by which the expression slice is delimited.
     // for most things, it's a newline, but for things that need a new indentation,
     // it's a colon instead.

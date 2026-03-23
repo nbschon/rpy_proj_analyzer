@@ -3,6 +3,8 @@
 //
 
 #include "Lexer.hpp"
+
+#include "ATL.hpp"
 #include "Node.hpp"
 #include "Token.hpp"
 
@@ -12,6 +14,7 @@
 #include <print>
 #include <ranges>
 #include <sstream>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -158,24 +161,162 @@ Lexer::Lexer(const std::filesystem::path &path) {
 }
 
 auto Lexer::tokenize() -> std::vector<Token> {
-    static std::unordered_set<std::string> atl_tf_props = {
-        "property",
-        "pause",
-        "warp",
-        "knot",
-        "clockwise",
-        "counterclockwise",
-        "circles",
-        "repeat",
-        "block",
-        "parallel",
-        "animation",
-        "on",
-        "contains",
-        "function",
-        "time",
-        "event",
+    static const std::unordered_map<std::string, TFPropType> atl_tf_props = {
+        { "pos", TFPropType::Pos },
+        { "xpos", TFPropType::XPos },
+        { "ypos", TFPropType::YPos },
+        { "anchor", TFPropType::Anchor },
+        { "xanchor", TFPropType::XAnchor },
+        { "yanchor", TFPropType::YAnchor },
+        { "align", TFPropType::Align },
+        { "xalign", TFPropType::XAlign },
+        { "yalign", TFPropType::YAlign },
+        { "offset", TFPropType::Offset },
+        { "xoffset", TFPropType::XOffset },
+        { "yoffset", TFPropType::YOffset },
+        { "xycenter", TFPropType::XYCenter },
+        { "xcenter", TFPropType::XCenter },
+        { "ycenter", TFPropType::YCenter },
+        { "subpixel", TFPropType::SubPixel },
+        { "rotate", TFPropType::Rotate },
+        { "rotate_pad", TFPropType::Rotate_Pad },
+        { "transform_anchor", TFPropType::TF_Anchor },
+        { "zoom", TFPropType::Zoom },
+        { "xzoom", TFPropType::XZoom },
+        { "yzoom", TFPropType::YZoom },
+        { "nearest", TFPropType::Nearest },
+        { "alpha", TFPropType::Alpha },
+        { "additive", TFPropType::Additive },
+        { "matrixcolor", TFPropType::MatrixColor },
+        { "blur", TFPropType::Blur },
+        { "around", TFPropType::Around },
+        { "angle", TFPropType::Angle },
+        { "radius", TFPropType::Radius },
+        { "anchoraround", TFPropType::AnchorAround },
+        { "anchorangle", TFPropType::AnchorAngle },
+        { "anchorradius", TFPropType::AnchorRadius },
+        { "crop", TFPropType::Crop },
+        { "corner1", TFPropType::Corner1 },
+        { "corner2", TFPropType::Corner2 },
+        { "xysize", TFPropType::XYSize },
+        { "xsize", TFPropType::XSize },
+        { "ysize", TFPropType::YSize },
+        { "fit", TFPropType::Fit },
+        { "xpan", TFPropType::XPan },
+        { "ypan", TFPropType::YPan },
+        { "xtile", TFPropType::XTile },
+        { "ytile", TFPropType::YTile },
+        { "delay", TFPropType::Delay },
+        { "events", TFPropType::Events },
+        { "fps", TFPropType::FPS },
+        { "show_cancels_hide", TFPropType::Show_Cancels_Hide },
     };
+
+    // static std::unordered_set<std::string> atl_trans = {
+    //     "dissolve",
+    //     "fade",
+    //     "pixellate",
+    //     "move",
+    //     "moveinright",
+    //     "moveinleft",
+    //     "moveintop",
+    //     "moveinbottom",
+    //     "moveoutright",
+    //     "moveoutleft",
+    //     "moveouttop",
+    //     "moveoutbottom",
+    //     "ease",
+    //     "easeinright",
+    //     "easeinleft",
+    //     "easeintop",
+    //     "easeinbottom",
+    //     "easeoutright",
+    //     "easeoutleft",
+    //     "easeouttop",
+    //     "easeoutbottom",
+    //     "zoomin",
+    //     "zoomout",
+    //     "zoominout",
+    //     "vpunch",
+    //     "hpunch",
+    //     "blinds",
+    //     "squares",
+    //     "wipeleft",
+    //     "wiperight",
+    //     "wipeup",
+    //     "wipedown",
+    //     "slideleft",
+    //     "slideright",
+    //     "slideup",
+    //     "slidedown",
+    //     "slideawayleft",
+    //     "slideawayright",
+    //     "slideawayup",
+    //     "slideawaydown",
+    //     "pushright",
+    //     "pushleft",
+    //     "pushup",
+    //     "pushdown",
+    //     "irisin",
+    //     "irisout",
+    // };
+    static const std::unordered_map<std::string, Transition> atl_trans = {
+        { "dissolve", Transition::Dissolve },
+        { "fade", Transition::Fade },
+        { "pixellate", Transition::Pixellate },
+        { "move", Transition::Move },
+        { "moveinright", Transition::MoveInRight },
+        { "moveinleft", Transition::MoveInLeft },
+        { "moveintop", Transition::MoveInTop },
+        { "moveinbottom", Transition::MoveInBottom },
+        { "moveoutright", Transition::MoveOutRight },
+        { "moveoutleft", Transition::MoveOutLeft },
+        { "moveouttop", Transition::MoveOutTop },
+        { "moveoutbottom", Transition::MoveOutBottom },
+        { "ease", Transition::Ease },
+        { "easeinright", Transition::EaseInRight },
+        { "easeinleft", Transition::EaseInLeft },
+        { "easeintop", Transition::EaseInTop },
+        { "easeinbottom", Transition::EaseInBottom },
+        { "easeoutright", Transition::EaseOutRight },
+        { "easeoutleft", Transition::EaseOutLeft },
+        { "easeouttop", Transition::EaseOutTop },
+        { "easeoutbottom", Transition::EaseOutBottom },
+        { "zoomin", Transition::ZoomIn },
+        { "zoomout", Transition::ZoomOut },
+        { "zoominout", Transition::ZoomInOut },
+        { "vpunch", Transition::VPunch },
+        { "hpunch", Transition::HPunch },
+        { "blinds", Transition::Blinds },
+        { "squares", Transition::Squares },
+        { "wipeleft", Transition::WipeLeft },
+        { "wiperight", Transition::WipeRight },
+        { "wipeup", Transition::WipeUp },
+        { "wipedown", Transition::WipeDown },
+        { "slideleft", Transition::SlideLeft },
+        { "slideright", Transition::SlideRight },
+        { "slideup", Transition::SlideUp },
+        { "slidedown", Transition::SlideDown },
+        { "slideawayleft", Transition::SlideAwayLeft },
+        { "slideawayright", Transition::SlideAwayRight },
+        { "slideawayup", Transition::SlideAwayUp },
+        { "slideawaydown", Transition::SlideAwayDown },
+        { "pushright", Transition::PushRight },
+        { "pushleft", Transition::PushLeft },
+        { "pushup", Transition::PushUp },
+        { "pushdown", Transition::PushDown },
+        { "irisin", Transition::IrisIn },
+        { "irisout", Transition::IrisOut },
+    };
+
+    static const std::unordered_map<std::string, Warper> atl_warpers = {
+        { "pause", Warper::Pause },
+        { "linear", Warper::Linear },
+        { "ease", Warper::Ease },
+        { "easein", Warper::EaseIn },
+        { "easeout", Warper::EaseOut },
+    };
+
     std::string txt_buff;
     while (peek()) {
         if (std::isalpha(*peek()) != 0) {
@@ -281,7 +422,11 @@ auto Lexer::tokenize() -> std::vector<Token> {
             } else if (txt_buff == "event") {
                 tokens.emplace_back(TokATLEvent{line, new_col, indent_level});
             } else if (atl_tf_props.contains(txt_buff)) {
-                tokens.emplace_back(TokATLProperty{line, new_col, indent_level, prop_from_str(txt_buff)});
+                tokens.emplace_back(TokATLProperty{line, new_col, indent_level, atl_tf_props.at(txt_buff)});
+            } else if (atl_trans.contains(txt_buff)) {
+                tokens.emplace_back(TokATLTransition{line, new_col, indent_level, atl_trans.at(txt_buff)});
+            } else if (atl_warpers.contains(txt_buff)) {
+                tokens.emplace_back(TokATLWarper{line, new_col, indent_level, atl_warpers.at(txt_buff)});
             } else {
                 tokens.emplace_back(TokIdent{line, new_col, indent_level, txt_buff});
             }

@@ -137,7 +137,13 @@ NodeWith::NodeWith(const Tok& token, std::span<const Token> expr_toks)
         return out;
     })) {
     unsigned idx = 0;
-    expr = fold_into_expr(expr_toks, idx);
+    trans = fold_into_expr(expr_toks, idx);
+}
+
+NodeWith::NodeWith(const Tok& token, const Transition& trans)
+    : Node(token), trans(trans),
+    expr_str(std::format("Transition: {}", ATL::trans_str(trans))),
+    display_str(std::format("Transition: {}", ATL::trans_str(trans))) {
 }
 
 auto NodeWith::to_string() const -> std::string {

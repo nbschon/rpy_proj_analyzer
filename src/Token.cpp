@@ -141,8 +141,8 @@ auto tok_str(const Token& token) -> std::string {
         [&](const TokTransform &) -> void {
             ret += "Transform";
         },
-        [&](const TokATLProperty &) -> void {
-            ret += "ATL Property";
+        [&](const TokATLProperty &t) -> void {
+            ret += std::format("ATL Property: {}", prop_str(t.type));
         },
         [&](const TokATLPause &) -> void {
             ret += "ATL Pause";
@@ -188,6 +188,12 @@ auto tok_str(const Token& token) -> std::string {
         },
         [&](const TokATLEvent &) -> void {
             ret += "ATL Event";
+        },
+        [&](const TokATLTransition &t) -> void {
+            ret += std::format("ATL Transition: {}", ATL::trans_str(t.trans));
+        },
+        [&](const TokATLWarper &t) -> void {
+            ret += std::format("ATL Transition: {}", ATL::warper_str(t.warper));
         },
         [&](const TokNewline &) -> void {
             ret = "\n";
@@ -408,6 +414,12 @@ auto tok_color(const Token &token) -> std::uint32_t {
             },
             [&](const TokATLEvent &) -> std::uint32_t {
                 return green;
+            },
+            [&](const TokATLTransition &) -> std::uint32_t {
+                return blue;
+            },
+            [&](const TokATLWarper &) -> std::uint32_t {
+                return blue;
             },
             [&](const TokTab&) -> std::uint32_t {
                 return black;

@@ -11,6 +11,8 @@
 #include <utility>
 #include <variant>
 
+#include "ATL.hpp"
+
 enum class OpType : std::uint8_t {
     Not,
     Plus,
@@ -363,6 +365,16 @@ struct TokATLTime : Tok {
 struct TokATLEvent : Tok {
     static constexpr std::string_view type_name = "ATLEvent";
 };
+
+struct TokATLTransition : Tok {
+    static constexpr std::string_view type_name = "ATLTransition";
+    Transition trans;
+};
+
+struct TokATLWarper : Tok {
+    static constexpr std::string_view type_name = "ATLWarper";
+    Warper warper;
+};
 // ATL tokens end here.
 
 struct TokNewline : Tok {
@@ -434,6 +446,8 @@ using Token = std::variant<
     TokATLFunction,
     TokATLTime,
     TokATLEvent,
+    TokATLTransition,
+    TokATLWarper,
     TokNewline,
     TokTab>;
 
@@ -790,6 +804,12 @@ auto tok_name() -> std::string_view {
             },
             [&](const TokATLEvent &) -> std::string {
                 return "event";
+            },
+            [&](const TokATLTransition &t) -> std::string {
+                return ATL::trans_str(t.trans);
+            },
+            [&](const TokATLWarper &t) -> std::string {
+                return ATL::warper_str(t.warper);
             },
             [&](const TokNewline &) -> std::string {
                 return "\n";

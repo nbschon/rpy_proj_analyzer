@@ -254,10 +254,12 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                 },
                 [&](const TokWith& t) {
                     idx++;
-                    if (auto slice = expr_slice<TokNewline>(tokens)) {
+                    if (auto trans = expect<TokATLTransition>(tokens)) {
+                        nodes.push_back(std::make_unique<NodeWith>(t, trans->trans));
+                    } else if (auto slice = expr_slice<TokNewline>(tokens)) {
                         nodes.push_back(std::make_unique<NodeWith>(t, *slice));
                     } else {
-                        errors.push_back(std::move(slice.error()));
+                        errors.push_back(multi_tok_error<TokATLTransition>(tokens, {"valid expression"}));
                         std::println(std::cerr, "{}", errors.back());
                     }
                 },
@@ -291,8 +293,8 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
 
                     std::unique_ptr<NodeChoice> choice = nullptr;
 
-                    // special case: if the menu has a second line, it's either
-                    // a say statement or a choice.
+                    // special case: if the menu has a second line, it's
+                    // either a say statement or a choice.
                     if (const auto str_tok = expect<TokStrLit>(tokens)) {
                         if (auto newline = expect<TokNewline>(tokens);
                             newline && str_tok->indent == t.indent + 1) {
@@ -308,7 +310,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                                 return;
                             }
                         } else {
-                            errors.push_back(std::move(newline.error()));
+                            errors.push_back(multi_tok_error<TokColon, TokIf, TokNewline>(tokens));
                             std::println(std::cerr, "{}", errors.back());
                             return;
                         }
@@ -345,6 +347,12 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     }
                 },
                 [&](const TokStrLit &t) {
+                    /*
+                     * a few cases for string literals:
+                     *  1. colon at the end? menu choice
+                     *  2. if at the end? menu choice w/ expression
+                     *  3. newline? normal dialogue
+                     */
                     idx++;
                     if (const auto colon = expect<TokColon>(tokens)) {
                         nodes.push_back(std::make_unique<NodeChoice>(t, t.text));
@@ -359,7 +367,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     else if (auto newline = expect<TokNewline>(tokens)) {
                         nodes.push_back(std::make_unique<NodeDialogue>(t, t.text));
                     } else {
-                        errors.push_back(std::move(newline.error()));
+                        errors.push_back(multi_tok_error<TokColon, TokIf, TokNewline>(tokens));
                         std::println(std::cerr, "{}", errors.back());
                     }
                 },
@@ -403,7 +411,7 @@ void Graph::generate_nodes(const std::vector<Token>& tokens) {
                     } else if (const auto sfx = expect<TokSfx>(tokens)) {
                         channel = AudioChannel::Sfx;
                     } else {
-                        errors.push_back(std::move(music.error()));
+                        errors.push_back(multi_tok_error<TokMusic, TokSfx>(tokens));
                         std::println(std::cerr, "{}", errors.back());
                     }
 

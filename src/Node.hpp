@@ -117,13 +117,16 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
+using WithTrans = std::variant<std::unique_ptr<Expr>, Transition>;
+
 class NodeWith final : public Node {
-    std::unique_ptr<Expr> expr;
+    WithTrans trans;
     std::string expr_str;
     std::string display_str;
 
 public:
     explicit NodeWith(const Tok& token, std::span<const Token> expr_toks);
+    NodeWith(const Tok& token, const Transition &trans);
 
     [[nodiscard]] auto to_string() const -> std::string override;
 
