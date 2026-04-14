@@ -5,6 +5,7 @@
 #ifndef RPY_PROJ_ANALYZER_NODE_HPP
 #define RPY_PROJ_ANALYZER_NODE_HPP
 
+#include "ATL.hpp"
 #include "DisplayNode.hpp"
 #include "Expr.hpp"
 #include "Token.hpp"
@@ -44,7 +45,8 @@ struct HideProps {
 };
 
 class Node {
-protected:
+// protected:
+public:
     unsigned line = 0;
     unsigned col = 0;
 
@@ -117,10 +119,8 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
-using WithTrans = std::variant<std::unique_ptr<Expr>, Transition>;
-
 class NodeWith final : public Node {
-    WithTrans trans;
+    std::unique_ptr<Expr> trans;
     std::string expr_str;
     std::string display_str;
 
@@ -287,6 +287,13 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
+class NodePass final : public Node {
+public:
+    explicit NodePass(const Tok& token);
+    [[nodiscard]] auto to_string() const -> std::string override;
+    [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
+};
+
 class NodeCall final : public Node {
     std::string label;
 
@@ -322,9 +329,9 @@ public:
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
 };
 
-class NodeTransform final : public NodeParent {
-    std::string name;
-};
+// class NodeTransform final : public NodeParent {
+//     std::string name;
+// };
 
 template<>
 struct std::formatter<Node> {

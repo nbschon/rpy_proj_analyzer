@@ -17,15 +17,15 @@
 
 #define H_A(t, tok) std::holds_alternative<t>(tok)
 
-template<class T, class... Us>
-struct variant_has;
-
-template<class T, class... Us>
-struct variant_has<T, std::variant<Us...>>
-    : std::bool_constant<(std::is_same_v<T, Us> || ...)> {};
-
-template <class T>
-concept InTokens = variant_has<T, std::remove_cvref_t<Token>>::value;
+// template<class T, class... Us>
+// struct variant_has;
+//
+// template<class T, class... Us>
+// struct variant_has<T, std::variant<Us...>>
+//     : std::bool_constant<(std::is_same_v<T, Us> || ...)> {};
+//
+// template <class T>
+// concept InTokens = variant_has<T, std::remove_cvref_t<Token>>::value;
 
 class Graph {
     std::vector<std::unique_ptr<Node>> nodes;
@@ -42,7 +42,7 @@ class Graph {
      * bugging me to change it, but they are making writes to some pointers.
      * Not sure what best practice is in a case like this.
      */
-    void connect_nodes() const;
+    void connect_ancestors() const;
     void connect_nexts() const;
 
     auto assign_scores(unsigned idx, double curr_score, OpType op) -> double;
@@ -113,73 +113,73 @@ class Graph {
     // the template argument is the token by which the expression slice is delimited.
     // for most things, it's a newline, but for things that need a new indentation,
     // it's a colon instead.
-    template<typename T>
-    requires InTokens<T>
-    [[nodiscard]] auto expr_slice() -> std::expected<std::span<const Token>, std::string> {
-        std::string error_msg;
-
-        const std::size_t start_idx = idx;
-
-        while (idx < tokens.size() && !std::holds_alternative<T>(tokens.at(idx)) && error_msg.empty()) {
-            const auto& token = tokens.at(idx);
-            std::visit(
-                Overload {
-                    [&](const TokIdent&) -> void {
-                        idx++;
-                    },
-                    [&](const TokStrLit&) -> void {
-                        idx++;
-                    },
-                    [&](const TokIntLit&) -> void {
-                        idx++;
-                    },
-                    [&](const TokFloatLit&) -> void {
-                        idx++;
-                    },
-                    [&](const TokBoolLit&) -> void {
-                        idx++;
-                    },
-                    [&](const TokOp&) -> void {
-                        idx++;
-                    },
-                    [&](const TokLParen&) -> void {
-                        idx++;
-                    },
-                    [&](const TokRParen&) -> void {
-                        idx++;
-                    },
-                    [&](const TokComma&) -> void {
-                        idx++;
-                    },
-                    [&](const TokNone) -> void {
-                        idx++;
-                    },
-                    [&]<typename U>(U&& other) -> void {
-                        using V = std::decay_t<U>;
-                        static_assert(std::is_base_of_v<Tok, V>, "expected derived from base Tok");
-                        const auto base_tok = static_cast<const Tok &>(other);
-                        error_msg = std::format("expected viable Expr token, got {} at {}", tok_name<V>(),
-                                                tok_pos(base_tok));
-                    },
-                }, token);
-        }
-
-        if (!error_msg.empty()) {
-            errors.push_back(error_msg);
-            return std::unexpected(error_msg);
-        }
-
-        const std::span all(tokens.data(), tokens.size());
-        return all.subspan(start_idx, idx - start_idx);
-    }
+    // template<typename T>
+    // requires InTokens<T>
+    // [[nodiscard]] auto expr_slice() -> std::expected<std::span<const Token>, std::string> {
+    //     std::string error_msg;
+    //
+    //     const std::size_t start_idx = idx;
+    //
+    //     while (idx < tokens.size() && !std::holds_alternative<T>(tokens.at(idx)) && error_msg.empty()) {
+    //         const auto& token = tokens.at(idx);
+    //         std::visit(
+    //             Overload {
+    //                 [&](const TokIdent&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokStrLit&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokIntLit&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokFloatLit&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokBoolLit&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokOp&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokLParen&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokRParen&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokComma&) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&](const TokNone) -> void {
+    //                     idx++;
+    //                 },
+    //                 [&]<typename U>(U&& other) -> void {
+    //                     using V = std::decay_t<U>;
+    //                     static_assert(std::is_base_of_v<Tok, V>, "expected derived from base Tok");
+    //                     const auto base_tok = static_cast<const Tok &>(other);
+    //                     error_msg = std::format("expected viable Expr token, got {} at {}", tok_name<V>(),
+    //                                             tok_pos(base_tok));
+    //                 },
+    //             }, token);
+    //     }
+    //
+    //     if (!error_msg.empty()) {
+    //         errors.push_back(error_msg);
+    //         return std::unexpected(error_msg);
+    //     }
+    //
+    //     const std::span all(tokens.data(), tokens.size());
+    //     return all.subspan(start_idx, idx - start_idx);
+    // }
 
     template<typename T>
     [[nodiscard]] auto add_cond_node(const Tok& t)
         -> std::unique_ptr<Node> {
         idx++;
 
-        const auto expr = expr_slice<TokColon>();
-        if (expr) {
+        const auto expr = expr_slice(tokens, idx);
+        if (expr && std::holds_alternative<TokColon>(tokens.at(idx))) {
             return std::make_unique<T>(t, *expr);
         }
 
@@ -188,7 +188,6 @@ class Graph {
     }
 
     [[nodiscard]] auto add_show_node(const Tok& t, bool is_scene = false) -> std::unique_ptr<Node>;
-
 
     void generate_nodes();
 

@@ -140,14 +140,14 @@ NodeWith::NodeWith(const Tok& token, std::span<const Token> expr_toks)
         out += std::format("{:cr} ", t);
         return out;
     })) {
-    unsigned idx = 0;
-    trans = fold_into_expr(expr_toks, idx);
+    trans = fold_into_expr(expr_toks);
 }
 
 NodeWith::NodeWith(const Tok& token, const Transition& trans)
-    : Node(token), trans(trans),
-    expr_str(std::format("Transition: {}", ATL::trans_str(trans))),
-    display_str(std::format("Transition: {}", ATL::trans_str(trans))) {
+    : Node(token),
+    trans(std::make_unique<ExprLit>(ATL::trans_str(trans))),
+    expr_str(ATL::trans_str(trans)),
+    display_str(ATL::trans_str(trans)) {
 }
 
 auto NodeWith::to_string() const -> std::string {
@@ -195,8 +195,7 @@ NodeChoice::NodeChoice(const Tok& token, std::string text, std::span<const Token
         out += std::format("{:r} ", t);
         return out;
     })) {
-    unsigned idx = 0;
-    clause = fold_into_expr(expr_toks, idx);
+    clause = fold_into_expr(expr_toks);
 }
 
 auto NodeChoice::to_string() const -> std::string {
@@ -259,8 +258,7 @@ NodeExpr::NodeExpr(const Tok& token, const std::span<const Token> expr_toks)
           out += std::format("{:cr} ", t);
           return out;
       })) {
-    unsigned idx = 0;
-    expr = fold_into_expr(expr_toks, idx);
+    expr = fold_into_expr(expr_toks);
     if (is_valid_assign(expr.get())) {
         type = DeclareType::Python;
     } else {
@@ -354,8 +352,7 @@ NodeIf::NodeIf(const Tok& token, const std::span<const Token> expr_toks)
           out += std::format("{:cr} ", t);
           return out;
       })) {
-    unsigned idx = 0;
-    expr = fold_into_expr(expr_toks, idx);
+    expr = fold_into_expr(expr_toks);
 }
 
 auto NodeIf::to_string() const -> std::string {
@@ -376,8 +373,7 @@ NodeElif::NodeElif(const Tok& token, const std::span<const Token> expr_toks)
           out += std::format("{:cr} ", t);
           return out;
       })) {
-    unsigned idx = 0;
-    expr = fold_into_expr(expr_toks, idx);
+    expr = fold_into_expr(expr_toks);
 }
 
 auto NodeElif::to_string() const -> std::string {
@@ -413,8 +409,7 @@ NodeWhile::NodeWhile(const Tok& token, const std::span<const Token> expr_toks)
               "{:cr} ", t);
           return out;
       })) {
-    unsigned idx = 0;
-    expr = fold_into_expr(expr_toks, idx);
+    expr = fold_into_expr(expr_toks);
 }
 
 auto NodeWhile::to_string() const -> std::string {
@@ -444,8 +439,7 @@ NodeReturn::NodeReturn(const Tok& token, const std::span<const Token> expr_toks)
               "{:cr} ", t);
           return out;
       })) {
-    unsigned idx = 0;
-    expr = fold_into_expr(expr_toks, idx);
+    expr = fold_into_expr(expr_toks);
 }
 
 auto NodeReturn::to_string() const -> std::string {
@@ -463,6 +457,18 @@ auto NodeReturn::make_display_node(raylib::Rectangle rect) const -> DisplayNode 
         return {this, rect, "Return", std::move(fields)};
     }
     return DisplayNode(this, rect, "Return");
+}
+
+NodePass::NodePass(const Tok& token)
+    : Node(token) {
+}
+
+auto NodePass::to_string() const -> std::string {
+    return "Pass";
+}
+
+auto NodePass::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
+    return DisplayNode(this, rect, "Pass");
 }
 
 NodeCall::NodeCall(const Tok& token, std::string label)

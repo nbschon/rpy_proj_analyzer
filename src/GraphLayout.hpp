@@ -21,10 +21,9 @@ struct LayoutDims {
     unsigned top_y{};
     unsigned w_units = 1;
     unsigned h_units = 1;
-    // raylib::Color color = raylib::Color::White();
 };
 
-enum class GroupType {
+enum class GroupType : std::uint8_t {
     If,
     Menu,
     Label,
@@ -66,7 +65,7 @@ public:
     unsigned center_offset = 0;
     std::vector<std::unique_ptr<LayoutBase>> displays;
 
-    LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, unsigned parent_idx, unsigned first_node, NodeParent* parent_ptr);
+    LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, unsigned parent_idx, unsigned first_node, const NodeParent* parent_ptr);
     auto to_string() -> std::string override;
     auto has_children() -> bool override;
     auto update_width() -> unsigned override;
@@ -91,33 +90,35 @@ public:
     auto update_height() -> unsigned override;
     void flatten(std::vector<LayoutBase*>& flat_disps) override;
     void collect_edges(std::unordered_map<Node*, Node*>& edges) override;
-    auto anchor_x() const -> int;
+    [[nodiscard]] auto anchor_x() const -> int;
 };
+
+constexpr int N_POINTS = 5;
 
 struct LayoutData {
     std::vector<DisplayNode> disps;
-    std::vector<std::array<raylib::Vector2, 5>> line_points;
+    std::vector<std::array<raylib::Vector2, N_POINTS>> line_points;
 };
 
 class GraphLayout {
-    std::vector<std::unique_ptr<LayoutBase>> groups;
+    std::vector<std::unique_ptr<LayoutBase>> top_levels;
     std::vector<LayoutBase*> flat_disps;
     void assign_dimensions() const;
-    void assign_layouts() const;
+    void assign_layouts();
     void flatten();
-    auto collect_edges() const -> std::unordered_map<Node*, Node*>;
+    [[nodiscard]] auto collect_edges() const -> std::unordered_map<Node*, Node*>;
 
 public:
     explicit GraphLayout(Graph &graph);
     auto get_groups() -> std::vector<std::unique_ptr<LayoutBase>>&;
     auto get_max_width() -> unsigned;
-    auto make_displayables(Graph &graph) -> std::pair<std::vector<DisplayNode>, std::vector<std::array<raylib::Vector2, 5>>>;
+    auto make_displayables(Graph &graph) -> std::pair<std::vector<DisplayNode>, std::vector<std::array<raylib::Vector2, N_POINTS>>>;
 };
 
 namespace Layout {
-    auto make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, unsigned parent_idx, unsigned idx) -> std::unique_ptr<LayoutGroup>;
+    auto make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, unsigned prev_idx, unsigned idx) -> std::unique_ptr<LayoutGroup>;
     auto make_menu(const std::vector<std::unique_ptr<Node>>& nodes, unsigned parent_idx, unsigned idx) -> std::unique_ptr<LayoutGroup>;
-    auto make_label(const std::vector<std::unique_ptr<Node>>& nodes, unsigned parent_idx, unsigned idx) -> std::unique_ptr<LayoutGroup>;
+    auto make_label(const std::vector<std::unique_ptr<Node>>& nodes, unsigned header_idx, unsigned idx) -> std::unique_ptr<LayoutGroup>;
 
     void layout_node(LayoutBase &disp, int left_x, unsigned row);
     void layout_column(const LayoutColumn &col, int left_x, unsigned row);

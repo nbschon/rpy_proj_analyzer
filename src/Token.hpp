@@ -11,8 +11,6 @@
 #include <utility>
 #include <variant>
 
-#include "ATL.hpp"
-
 enum class OpType : std::uint8_t {
     Not,
     Plus,
@@ -39,72 +37,9 @@ enum class OpType : std::uint8_t {
     RParen,
 };
 
-/*
- * Transformation property information borrowed from here:
- * https://www.renpy.org/doc/html/transform_properties.html
- */
-enum class TFPropType : std::uint8_t {
-    /* Name of property    Params */
-    // Positioning
-    Pos,                // (pos, pos)
-    XPos,               // pos
-    YPos,               // pos
-    Anchor,             // (pos, pos)
-    XAnchor,            // pos
-    YAnchor,            // pos
-    Align,              // (float, float)
-    XAlign,             // float
-    YAlign,             // float
-    Offset,             // (abs, abs)
-    XOffset,            // abs
-    YOffset,            // abs
-    XYCenter,           // (pos, pos)
-    XCenter,            // pos
-    YCenter,            // pos
-    SubPixel,           // bool
-    // Rotation
-    Rotate,             // float | None
-    Rotate_Pad,         // bool
-    TF_Anchor,          // bool
-    // Zoom & Flip
-    Zoom,               // float
-    XZoom,              // float
-    YZoom,              // float
-    // Pixel Effects
-    Nearest,            // bool
-    Alpha,              // float
-    Additive,           // float
-    MatrixColor,        // None | Matrix | MatrixColor
-    Blur,               // float | None
-    // Polar Positioning
-    Around,             // (pos, pos)
-    Angle,              // float
-    Radius,             // pos
-    // Polar Positioning of Anchor
-    AnchorAround,       // (pos, pos)
-    AnchorAngle,        // (float)
-    AnchorRadius,       // (pos)
-    // Crop & Resize
-    Crop,               // None | (pos, pos, pos, pos)
-    Corner1,            // None | (pos, pos)
-    Corner2,            // None | (pos, pos)
-    XYSize,             // None | (pos, pos)
-    XSize,              // None | pos
-    YSize,              // None | pos
-    Fit,                // None | str
-    // Pan & Tile
-    XPan,               // None | float
-    YPan,               // None | float
-    XTile,              // int
-    YTile,              // int
-    // Transitions
-    Delay,              // bool
-    Events,             // float
-    // Other
-    FPS,                // None | float
-    Show_Cancels_Hide,  // bool
-    // not adding deprecated TF properties...
-};
+enum class TFProp : std::uint8_t;
+enum class Warper : std::uint8_t;
+enum class Transition : std::uint8_t;
 
 struct Tok {
     unsigned line;
@@ -202,18 +137,18 @@ struct TokLabel : Tok {
 };
 
 struct TokIdent : Tok {
-    std::string name;
     static constexpr std::string_view type_name = "Identifier";
+    std::string name;
 };
 
 struct TokStrLit : Tok {
-    std::string text;
     static constexpr std::string_view type_name = "String Literal";
+    std::string text;
 };
 
 struct TokIntLit : Tok {
-    int value;
     static constexpr std::string_view type_name = "Integer Literal";
+    int value;
 };
 
 struct TokFloatLit : Tok {
@@ -303,7 +238,7 @@ struct TokTransform : Tok {
 
 struct TokATLProperty : Tok {
     static constexpr std::string_view type_name = "ATLProperty";
-    TFPropType type;
+    TFProp type;
 };
 
 struct TokATLPause : Tok {
@@ -505,110 +440,6 @@ inline auto op_str(const OpType &type) -> std::string {
     }
 }
 
-inline auto prop_str(const TFPropType &type) -> std::string {
-    switch (type) {
-        case TFPropType::Pos:
-            return "pos";
-        case TFPropType::XPos:
-            return "xpos";
-        case TFPropType::YPos:
-            return "ypos";
-        case TFPropType::Anchor:
-            return "anchor";
-        case TFPropType::XAnchor:
-            return "xanchor";
-        case TFPropType::YAnchor:
-            return "yanchor";
-        case TFPropType::Align:
-            return "align";
-        case TFPropType::XAlign:
-            return "xalign";
-        case TFPropType::YAlign:
-            return "yalign";
-        case TFPropType::Offset:
-            return "offset";
-        case TFPropType::XOffset:
-            return "xoffset";
-        case TFPropType::YOffset:
-            return "yoffset";
-        case TFPropType::XYCenter:
-            return "xycenter";
-        case TFPropType::XCenter:
-            return "xcenter";
-        case TFPropType::YCenter:
-            return "ycenter";
-        case TFPropType::SubPixel:
-            return "subpixel";
-        case TFPropType::Rotate:
-            return "rotate";
-        case TFPropType::Rotate_Pad:
-            return "rotate_pad";
-        case TFPropType::TF_Anchor:
-            return "transform_anchor";
-        case TFPropType::Zoom:
-            return "zoom";
-        case TFPropType::XZoom:
-            return "xzoom";
-        case TFPropType::YZoom:
-            return "yzoom";
-        case TFPropType::Nearest:
-            return "nearest";
-        case TFPropType::Alpha:
-            return "alpha";
-        case TFPropType::Additive:
-            return "additive";
-        case TFPropType::MatrixColor:
-            return "matrixcolor";
-        case TFPropType::Blur:
-            return "blur";
-        case TFPropType::Around:
-            return "around";
-        case TFPropType::Angle:
-            return "angle";
-        case TFPropType::Radius:
-            return "radius";
-        case TFPropType::AnchorAround:
-            return "anchoraround";
-        case TFPropType::AnchorAngle:
-            return "anchorangle";
-        case TFPropType::AnchorRadius:
-            return "anchorradius";
-        case TFPropType::Crop:
-            return "crop";
-        case TFPropType::Corner1:
-            return "corner1";
-        case TFPropType::Corner2:
-            return "corner2";
-        case TFPropType::XYSize:
-            return "xysize";
-        case TFPropType::XSize:
-            return "xsize";
-        case TFPropType::YSize:
-            return "ysize";
-        case TFPropType::Fit:
-            return "fit";
-        case TFPropType::XPan:
-            return "xpan";
-        case TFPropType::YPan:
-            return "ypan";
-        case TFPropType::XTile:
-            return "xtile";
-        case TFPropType::YTile:
-            return "ytile";
-        case TFPropType::Delay:
-            return "delay";
-        case TFPropType::Events:
-            return "events";
-        case TFPropType::FPS:
-            return "fps";
-        case TFPropType::Show_Cancels_Hide:
-            return "show_cancels_hide";
-        default:
-            std::println(std::cerr, "Invalid property in transformation");
-            std::unreachable();
-    }
-}
-
 template<class... Ts>
 struct Overload : Ts... {
     using Ts::operator()...;
@@ -622,209 +453,13 @@ auto tok_name() -> std::string_view {
     return T::type_name;
 }
 
-[[nodiscard]] inline auto raw_str(const Token &tok) -> std::string {
-    return std::visit(
-        Overload{
-            [&](const TokDollarSign &) -> std::string {
-                return "$";
-            },
-            [&](const TokColon &) -> std::string {
-                return ":";
-            },
-            [&](const TokLParen &) -> std::string {
-                return "(";
-            },
-            [&](const TokRParen &) -> std::string {
-                return ")";
-            },
-            [&](const TokLCurly &) -> std::string {
-                return "{";
-            },
-            [&](const TokRCurly &) -> std::string {
-                return "}";
-            },
-            [&](const TokLBracket &) -> std::string {
-                return "[";
-            },
-            [&](const TokRBracket &) -> std::string {
-                return "]";
-            },
-            [&](const TokComma &) -> std::string {
-                return ",";
-            },
-            [&](const TokShow &) -> std::string {
-                return "show";
-            },
-            [&](const TokHide &) -> std::string {
-                return "hide";
-            },
-            [&](const TokScene &) -> std::string {
-                return "scene";
-            },
-            [&](const TokNone &) -> std::string {
-                return "None";
-            },
-            [&](const TokMenu &) -> std::string {
-                return "menu";
-            },
-            [&](const TokChoice &) -> std::string {
-                return "ch";
-            },
-            [&](const TokAt &) -> std::string {
-                return "at";
-            },
-            [&](const TokAs &) -> std::string {
-                return "as";
-            },
-            [&](const TokBehind &) -> std::string {
-                return "behind";
-            },
-            [&](const TokOnlayer &) -> std::string {
-                return "onlayer";
-            },
-            [&](const TokZOrder &) -> std::string {
-                return "zorder";
-            },
-            [&](const TokWith &) -> std::string {
-                return "with";
-            },
-            [&](const TokLabel &) -> std::string {
-                return "label";
-            },
-            [&](const TokIdent &t) -> std::string {
-                return t.name;
-            },
-            [&](const TokStrLit &t) -> std::string {
-                return t.text;
-            },
-            [&](const TokIntLit &t) -> std::string {
-                return std::format("{}", t.value);
-            },
-            [&](const TokFloatLit &t) -> std::string {
-                return std::format("{}", t.value);
-            },
-            [&](const TokBoolLit &t) -> std::string {
-                return std::format("{}", t.value ? "True" : "False");
-            },
-            [&](const TokOp &t) -> std::string {
-                return op_str(t.type);
-            },
-            [&](const TokDefault &) -> std::string {
-                return "default";
-            },
-            [&](const TokDefine &) -> std::string {
-                return "define";
-            },
-            [&](const TokSet &) -> std::string {
-                return "set";
-            },
-            [&](const TokPlay &) -> std::string {
-                return "play";
-            },
-            [&](const TokMusic &) -> std::string {
-                return "music";
-            },
-            [&](const TokSfx &) -> std::string {
-                return "sfx";
-            },
-            [&](const TokIf &) -> std::string {
-                return "if";
-            },
-            [&](const TokElif &) -> std::string {
-                return "elif";
-            },
-            [&](const TokElse &) -> std::string {
-                return "else";
-            },
-            [&](const TokWhile &) -> std::string {
-                return "while";
-            },
-            [&](const TokReturn &) -> std::string {
-                return "return";
-            },
-            [&](const TokPass &) -> std::string {
-                return "pass";
-            },
-            [&](const TokCall &) -> std::string {
-                return "call";
-            },
-            [&](const TokJump &) -> std::string {
-                return "jump";
-            },
-            [&](const TokImage &) -> std::string {
-                return "image";
-            },
-            [&](const TokTransform &) -> std::string {
-                return "transform";
-            },
-            [&](const TokATLProperty &t) -> std::string {
-                return prop_str((t.type));
-            },
-            [&](const TokATLPause &) -> std::string {
-                return "pause";
-            },
-            [&](const TokATLWarp &) -> std::string {
-                return "warp";
-            },
-            [&](const TokATLKnot &) -> std::string {
-                return "knot";
-            },
-            [&](const TokATLClockwise &) -> std::string {
-                return "clockwise";
-            },
-            [&](const TokATLCCWise &) -> std::string {
-                return "counterclockwise";
-            },
-            [&](const TokATLCircles &) -> std::string {
-                return "circles";
-            },
-            [&](const TokATLRepeat &) -> std::string {
-                return "repeat";
-            },
-            [&](const TokATLBlock &) -> std::string {
-                return "block";
-            },
-            [&](const TokATLParallel &) -> std::string {
-                return "parallel";
-            },
-            [&](const TokATLAnimation &) -> std::string {
-                return "animation";
-            },
-            [&](const TokATLOn &) -> std::string {
-                return "on";
-            },
-            [&](const TokATLContains &) -> std::string {\
-                return "contains";
-            },
-            [&](const TokATLFunction &) -> std::string {
-                return "function";
-            },
-            [&](const TokATLTime &) -> std::string {
-                return "time";
-            },
-            [&](const TokATLEvent &) -> std::string {
-                return "event";
-            },
-            [&](const TokATLTransition &t) -> std::string {
-                return ATL::trans_str(t.trans);
-            },
-            [&](const TokATLWarper &t) -> std::string {
-                return ATL::warper_str(t.warper);
-            },
-            [&](const TokNewline &) -> std::string {
-                return "\n";
-            },
-            [&](const TokTab &) -> std::string {
-                return "\t";
-            },
-        }, tok);
-}
+[[nodiscard]] auto raw_str(const Token &tok) -> std::string;
 
 auto tok_str(const Token &token) -> std::string;
 auto tok_pos(const Token &token) -> std::string;
 auto tok_pos(const Tok &token) -> std::string;
+auto tok_indent(const Token &token) -> unsigned;
 auto tok_color(const Token &token) -> std::uint32_t;
-auto prop_from_str(const std::string_view &str) -> TFPropType;
 
 auto operator<<(std::ostream &stream, const Token &token) -> std::ostream &;
 

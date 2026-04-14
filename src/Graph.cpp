@@ -12,7 +12,7 @@
 template<class T, class... Ts>
 constexpr bool is_val = (std::is_same_v<T, Ts> || ...);
 
-void Graph::connect_nodes() const {
+void Graph::connect_ancestors() const {
     std::vector<unsigned> parents; // treat like a stack
     std::unordered_map<unsigned, unsigned> last_child;
 
@@ -30,24 +30,37 @@ void Graph::connect_nodes() const {
             }
         }
 
+        for (int i = 0; i < last_child.size(); ++i) {
+            if (last_child[i] > indent) {
+                last_child.erase(i);
+                i--;
+            }
+        }
+
+        if (last_child.contains(indent)) {
+            const auto prev = last_child[indent];
+            nodes.at(prev)->next = i;
+            curr->prev = prev;
+        }
+
         if (!parents.empty()) { // if we have nodes
             if (Node* top = nodes.at(parents.back()).get()) { // if the top of the stack is valid
-                if (top->has_children() && indent == top->indent + 1) { // if the top is a parent and
+                if (top->has_children() && indent == top->indent + 1) { // if top is a parent and
                                                                         // current indent is one after the top
                     curr->parent = parents.back(); // set the current node's parent to the active parent
                     if (auto* parent = static_cast<NodeParent*>(top); !parent->first_child) {
                         // if the parent does not have a child yet, set the child
                         parent->first_child = i;
-                    } else if (parent->first_child) {
-                        const unsigned prev = last_child.at(parents.back());
-                        nodes.at(prev)->next = i;
-                        curr->prev = prev;
+                    // } else if (parent->first_child) {
+                    //     const unsigned prev = last_child.at(parents.back());
+                    //     nodes.at(prev)->next = i;
+                    //     curr->prev = prev;
                     }
-
-                    last_child[parents.back()] = i;
                 }
             }
         }
+
+        last_child[indent] = i;
 
         if (curr->has_children()) {
             parents.push_back(i);
@@ -142,7 +155,7 @@ auto Graph::add_show_node(const Tok& t, bool is_scene) -> std::unique_ptr<Node> 
         if (auto tf_tok = expect<TokIdent>()) {
             props.transforms.push_back(tf_tok->name);
             while (auto comma_tok = expect<TokComma>()) {
-                if (const auto next_tf = expect<TokIdent>()) {
+                if (auto next_tf = expect<TokIdent>()) {
                     props.transforms.push_back(next_tf->name);
                 } else {
                     errors.push_back(std::move(next_tf.error()));
@@ -187,6 +200,13 @@ auto Graph::add_show_node(const Tok& t, bool is_scene) -> std::unique_ptr<Node> 
         }
     }
 
+    if (const auto colon = expect<TokColon>()) {
+        while (H_A(TokNewline, tokens.at(idx)) || H_A(TokTab, tokens.at(idx))) {
+            idx++;
+        }
+        ATL::make_atl_block(tokens, idx, colon->indent);
+    }
+
     // this is a bit of a hack, should probably be changed in the future
     if (std::holds_alternative<TokWith>(tokens.at(idx))) {
         idx--;
@@ -203,7 +223,7 @@ void Graph::generate_nodes() {
             Overload{
                 [&](const TokDollarSign& t) {
                     idx++;
-                    if (auto slice = expr_slice<TokNewline>(); slice) {
+                    if (auto slice = expr_slice(tokens, idx)) {
                         nodes.push_back(std::make_unique<NodeExpr>(t, *slice));
                         nodes_w_expr.push_back(nodes.back().get());
                     } else {
@@ -256,7 +276,7 @@ void Graph::generate_nodes() {
                     idx++;
                     if (auto trans = expect<TokATLTransition>()) {
                         nodes.push_back(std::make_unique<NodeWith>(t, trans->trans));
-                    } else if (auto slice = expr_slice<TokNewline>()) {
+                    } else if (auto slice = expr_slice(tokens, idx)) {
                         nodes.push_back(std::make_unique<NodeWith>(t, *slice));
                     } else {
                         errors.push_back(multi_tok_error<TokATLTransition>({"valid expression"}));
@@ -302,7 +322,8 @@ void Graph::generate_nodes() {
                         } else if (const auto colon = expect<TokColon>()) {
                             choice = std::make_unique<NodeChoice>(*colon, str_tok->text);
                         } else if (const auto if_tok = expect<TokIf>()) {
-                            if (auto slice = expr_slice<TokColon>()) {
+                            if (auto slice = expr_slice(tokens, idx);
+                                slice && std::holds_alternative<TokColon>(tokens.at(idx))) {
                                 choice = std::make_unique<NodeChoice>(*if_tok, str_tok->text, *slice);
                             } else {
                                 errors.push_back(std::move(slice.error()));
@@ -357,14 +378,14 @@ void Graph::generate_nodes() {
                     if (const auto colon = expect<TokColon>()) {
                         nodes.push_back(std::make_unique<NodeChoice>(t, t.text));
                     } else if (const auto if_tok = expect<TokIf>()) {
-                        if (auto slice = expr_slice<TokColon>()) {
+                        if (auto slice = expr_slice(tokens, idx);
+                            slice && std::holds_alternative<TokColon>(tokens.at(idx))) {
                             nodes.push_back(std::make_unique<NodeChoice>(*if_tok, t.text, *slice));
                         } else {
                             errors.push_back(std::move(slice.error()));
                             std::println(std::cerr, "{}", errors.back());
                         }
-                    }
-                    else if (auto newline = expect<TokNewline>()) {
+                    } else if (std::holds_alternative<TokNewline>(tokens.at(idx))) {
                         nodes.push_back(std::make_unique<NodeDialogue>(t, t.text));
                     } else {
                         errors.push_back(multi_tok_error<TokColon, TokIf, TokNewline>());
@@ -373,9 +394,8 @@ void Graph::generate_nodes() {
                 },
                 [&](const TokDefault &t) {
                     idx++;
-                    if (auto slice = expr_slice<TokNewline>()) {
-                        unsigned e_idx = 0;
-                        auto new_expr = fold_into_expr(*slice, e_idx);
+                    if (auto slice = expr_slice(tokens, idx)) {
+                        auto new_expr = fold_into_expr(*slice);
                         if (is_valid_assign(new_expr.get())) {
                             nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(new_expr), false));
                             nodes_w_expr.push_back(nodes.back().get());
@@ -389,9 +409,8 @@ void Graph::generate_nodes() {
                 },
                 [&](const TokDefine &t) {
                     idx++;
-                    if (auto slice = expr_slice<TokNewline>()) {
-                        unsigned e_idx = 0;
-                        auto new_expr = fold_into_expr(*slice, e_idx);
+                    if (auto slice = expr_slice(tokens, idx)) {
+                        auto new_expr = fold_into_expr(*slice);
                         if (is_valid_assign(new_expr.get())) {
                             nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(new_expr), true));
                             nodes_w_expr.push_back(nodes.back().get());
@@ -451,17 +470,18 @@ void Graph::generate_nodes() {
                 },
                 [&](const TokReturn& t) {
                     idx++;
-                    if (auto slice = expr_slice<TokNewline>()) {
-                        if (slice->empty()) {
-                            nodes.push_back(std::make_unique<NodeReturn>(t));
-                        } else {
-                            nodes.push_back(std::make_unique<NodeReturn>(t, *slice));
-                        }
+                    if (auto slice = expr_slice(tokens, idx)) {
+                        nodes.push_back(std::make_unique<NodeReturn>(t, *slice));
                         nodes_w_expr.push_back(nodes.back().get());
                     } else {
-                        errors.push_back(std::move(slice.error()));
-                        std::println(std::cerr, "{}", errors.back());
+                        nodes.push_back(std::make_unique<NodeReturn>(t));
+                        // errors.push_back(std::move(slice.error()));
+                        // std::println(std::cerr, "{}", errors.back());
                     }
+                },
+                [&](const TokPass& t) {
+                    idx++;
+                    nodes.push_back(std::make_unique<NodePass>(t));
                 },
                 [&](const TokCall& t) {
                     idx++;
@@ -534,7 +554,7 @@ void Graph::generate_nodes() {
     std::println("--------------------");
     if (errors.empty()) {
         std::println("parsing script OK!");
-        connect_nodes();
+        connect_ancestors();
         connect_nexts();
     } else {
         std::println(std::cerr, "Parsing script encountered {} error(s):", errors.size());

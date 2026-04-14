@@ -24,18 +24,21 @@ auto LoadScreen::get_dropped_path() -> std::optional<std::filesystem::path> {
 }
 
 void LoadScreen::update(const raylib::Window &win, State& state) {
-    if (const auto path = get_dropped_path(); std::filesystem::is_directory(*path)) {
-        got_path = false;
-        state.path = path;
-        state.path_type = State::PathType::Directory;
-        state.mode = State::Mode::View;
-    } else if (std::filesystem::is_regular_file(*path) && path->extension() == ".rpy") {
-        got_path = false;
-        state.path = path;
-        state.path_type = State::PathType::File;
-        state.mode = State::Mode::View;
-    } else if (path) {
-        dropped_path = std::format("{{i}}{}{{/i}} is not a valid Ren'Py script or project folder.", path->string());
+    get_dropped_path();
+    if (const auto path = get_dropped_path()) {
+        if (std::filesystem::is_directory(*path)) {
+            got_path = false;
+            state.path = path;
+            state.path_type = State::PathType::Directory;
+            state.mode = State::Mode::View;
+        } else if (std::filesystem::is_regular_file(*path) && path->extension() == ".rpy") {
+            got_path = false;
+            state.path = path;
+            state.path_type = State::PathType::File;
+            state.mode = State::Mode::View;
+        } else {
+            dropped_path = std::format("{{i}}{}{{/i}} is not a valid Ren'Py script or project folder.", path->string());
+        }
     }
 }
 
@@ -159,9 +162,6 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
         scroll_speed += 5.0f;
     } else if (IsKeyPressed(KEY_DOWN)) {
         scroll_speed -= 5.0f;
-        if (scroll_speed < 0) {
-            scroll_speed = 5.0f;
-        }
     }
 
     if (App::mod_down() && IsKeyPressed(KEY_D)) {
@@ -189,6 +189,10 @@ void ViewScreen::update(const raylib::Window &win, State& state) {
     } else if (!App::mod_down()) {
         camera.target.x -= GetMouseWheelMoveV().x * scroll_speed;
         camera.target.y -= GetMouseWheelMoveV().y * scroll_speed;
+    }
+    
+    if (scroll_speed < 0) {
+        scroll_speed = 5.0f;
     }
 
     const raylib::Vector2 before_zoom = GetScreenToWorld2D(GetMousePosition(), camera);

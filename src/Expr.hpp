@@ -8,6 +8,7 @@
 #include "Token.hpp"
 
 #include <cstdint>
+#include <expected>
 #include <iostream>
 #include <memory>
 #include <span>
@@ -15,6 +16,16 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+template<class T, class... Us>
+struct variant_has;
+
+template<class T, class... Us>
+struct variant_has<T, std::variant<Us...>>
+    : std::bool_constant<(std::is_same_v<T, Us> || ...)> {};
+
+template <class T>
+concept InTokens = variant_has<T, std::remove_cvref_t<Token>>::value;
 
 enum class UnaryOp : std::uint8_t {
     Not,
@@ -202,8 +213,17 @@ struct ExprCall : Expr {
     [[nodiscard]] auto to_string() const -> std::string override;
 };
 
+// [[nodiscard]] auto expr_toks(Expr *expr) -> std::span<const Token> {
+//
+// };
+
+// template<typename... Ts>
+// requires (InTokens<Ts> && ...)
+[[nodiscard]] auto expr_slice(const std::vector<Token> &tokens, unsigned &idx) -> std::expected<std::span<const Token>, std::string>;
+
+
 [[nodiscard]] auto split_inside_parens(std::span<const Token> toks, unsigned &start_idx) -> std::unique_ptr<ExprCall>;
-[[nodiscard]] auto fold_into_expr(std::span<const Token> toks, unsigned &idx, float min_prec = 0.0) -> std::unique_ptr<Expr>;
+[[nodiscard]] auto fold_into_expr(std::span<const Token> toks, unsigned idx = 0, float min_prec = 0.0) -> std::unique_ptr<Expr>;
 [[nodiscard]] auto is_valid_assign(const Expr *expr) -> bool;
 
 

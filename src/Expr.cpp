@@ -102,6 +102,69 @@ auto ExprCall::to_string() const -> std::string {
     return std::format("[Callee: {}, {}, {}]", callee_str, arg_str, kwarg_str);
 }
 
+auto expr_slice(const std::vector<Token> &tokens, unsigned &idx) -> std::expected<std::span<const Token>, std::string> {
+    std::string error_msg;
+    const std::size_t start_idx = idx;
+
+    bool get_toks = true;
+    while (get_toks) {
+        const auto& token = tokens.at(idx);
+        std::visit(
+            Overload {
+                [&](const TokIdent&) -> void {
+                    idx++;
+                },
+                [&](const TokStrLit&) -> void {
+                    idx++;
+                },
+                [&](const TokIntLit&) -> void {
+                    idx++;
+                },
+                [&](const TokFloatLit&) -> void {
+                    idx++;
+                },
+                [&](const TokBoolLit&) -> void {
+                    idx++;
+                },
+                [&](const TokOp&) -> void {
+                    idx++;
+                },
+                [&](const TokLParen&) -> void {
+                    idx++;
+                },
+                [&](const TokRParen&) -> void {
+                    idx++;
+                },
+                [&](const TokComma&) -> void {
+                    idx++;
+                },
+                [&](const TokNone) -> void {
+                    idx++;
+                },
+                [&]<typename U>(U&& other) -> void {
+                    get_toks = false;
+                    // using V = std::decay_t<U>;
+                    // static_assert(std::is_base_of_v<Tok, V>, "expected derived from base Tok");
+                    // const auto base_tok = static_cast<const Tok &>(other);
+                    // error_msg = std::format("expected viable Expr token, got {} at {}", tok_name<V>(),
+                    //                         tok_pos(base_tok));
+                },
+            }, token);
+    }
+
+    if (!error_msg.empty()) {
+        return std::unexpected(error_msg);
+    }
+
+    if (start_idx == idx) {
+        return std::unexpected(
+            std::format("failed to make span of valid Tokens at {}", tok_pos(tokens.at(idx))));
+    }
+
+    const std::span all(tokens.data(), tokens.size());
+    return all.subspan(start_idx, idx - start_idx);
+}
+
 auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx) -> std::unique_ptr<ExprCall> {
     // if (std::holds_alternative<TokLParen>(toks.front()) && std::holds_alternative<TokRParen>(toks.back())) {
     //     std::println("good args!!!");
@@ -168,9 +231,7 @@ auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx) -> st
         if (a.empty()) {
             std::println(std::cerr, "empty arg! bad!");
         } else {
-            unsigned e_start_idx = 0;
-            // auto e = fold_into_expr(a, e_start_idx);
-            fn_args.emplace_back(fold_into_expr(a, e_start_idx));
+            fn_args.emplace_back(fold_into_expr(a));
         }
     }
 
@@ -181,7 +242,7 @@ auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx) -> st
  * Adapted from here:
  * https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
  */
-auto fold_into_expr(std::span<const Token> toks, unsigned& idx, const float min_prec) -> std::unique_ptr<Expr> {
+auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_prec) -> std::unique_ptr<Expr> {
     auto peek = [&]() -> std::optional<const Token> {
         if (idx < toks.size()) {
             return toks[idx];
@@ -223,7 +284,7 @@ auto fold_into_expr(std::span<const Token> toks, unsigned& idx, const float min_
                 return std::make_unique<ExprUnary>(t.type, std::move(rhs));
             },
             [&](auto&&) -> std::unique_ptr<Expr> {
-                std::println(std::cerr, "bad token");
+                std::println(std::cerr, "bad token in expression");
                 std::unreachable();
             },
         }, lhs_tok);

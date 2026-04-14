@@ -8,16 +8,20 @@
 #include <cassert>
 #include <ranges>
 
-auto Layout::make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, unsigned idx,
-                      unsigned prev_idx) -> std::unique_ptr<LayoutGroup> {
+#include <chrono>
+#include <thread>
+
+auto Layout::make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, const unsigned prev_idx,
+                      const unsigned idx) -> std::unique_ptr<LayoutGroup> {
     std::vector<LayoutColumn> branches;
     const unsigned if_idx = idx;
-    std::vector<unsigned> elif_idxs;
 
+    std::vector<unsigned> elif_idxs;
     std::vector<unsigned> col_header_idxs;
 
     bool do_grouping = true;
-    if (auto if_node = dynamic_cast<NodeIf *>(nodes.at(idx).get())) {
+
+    if (auto *if_node = dynamic_cast<NodeIf*>(nodes.at(idx).get())) {
         col_header_idxs.push_back(idx);
         if (if_node->first_child && if_node->after_block) {
             LayoutColumn col(nodes, prev_idx, idx, if_node);
@@ -27,25 +31,19 @@ auto Layout::make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, unsigned 
 
     auto next = nodes.at(idx)->next;
     while (do_grouping && next) {
-        if (dynamic_cast<NodeIf *>(nodes.at(*next).get())) {
+        if (dynamic_cast<NodeIf*>(nodes.at(*next).get())) {
             do_grouping = false;
-            // auto if_node = dynamic_cast<NodeIf*>(nodes.at(*next).get());
-            // if (if_node->first_child && if_node->after_block) {
-            //     branches.emplace_back(nodes, *if_node->first_child, *if_node->after_block);
-            // }
-        } else if (dynamic_cast<NodeElif *>(nodes.at(*next).get())) {
+        } else if (dynamic_cast<NodeElif*>(nodes.at(*next).get())) {
             col_header_idxs.push_back(*next);
-            if (auto elif_node = dynamic_cast<NodeElif *>(nodes.at(*next).get());
+            if (auto *elif_node = dynamic_cast<NodeElif*>(nodes.at(*next).get());
                 elif_node->first_child && elif_node->after_block) {
-                // branches.emplace_back(nodes, *elif_node->first_child, *elif_node->after_block);
                 LayoutColumn col(nodes, prev_idx, *next, elif_node);
                 branches.push_back(std::move(col));
             }
-        } else if (dynamic_cast<NodeElse *>(nodes.at(*next).get())) {
+        } else if (dynamic_cast<NodeElse*>(nodes.at(*next).get())) {
             col_header_idxs.push_back(*next);
-            if (auto else_node = dynamic_cast<NodeElse *>(nodes.at(*next).get());
+            if (auto *else_node = dynamic_cast<NodeElse*>(nodes.at(*next).get());
                 else_node->first_child && else_node->after_block) {
-                // branches.emplace_back(nodes, *else_node->first_child, *else_node->after_block);
                 LayoutColumn col(nodes, prev_idx, *next, else_node);
                 branches.push_back(std::move(col));
             }
@@ -57,22 +55,16 @@ auto Layout::make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, unsigned 
 
     auto c_to_p =
         col_header_idxs
-        | std::views::transform([&](const unsigned& h_idx) {
+        | std::views::transform([&](const unsigned& h_idx) -> auto {
             return std::pair{nodes.at(h_idx).get(), nodes.at(before_idx).get()};
         })
-        | std::ranges::to<std::unordered_map<Node *, Node *>>();
-
-    // std::println("--------------------");
-    // for (const auto [child_ptr, parent_ptr] : c_to_p) {
-    //     std::println("{} branch points to {}", *child_ptr, *parent_ptr);
-    // }
-    // std::println("--------------------");
+        | std::ranges::to<std::unordered_map<Node*, Node*>>();
 
     return std::make_unique<LayoutGroup>(if_idx, GroupType::If, std::move(branches), std::move(c_to_p));
 }
 
-auto Layout::make_menu(const std::vector<std::unique_ptr<Node>>& nodes, unsigned idx,
-                       unsigned parent_idx) -> std::unique_ptr<LayoutGroup> {
+auto Layout::make_menu(const std::vector<std::unique_ptr<Node>>& nodes, const unsigned parent_idx,
+                       const unsigned idx) -> std::unique_ptr<LayoutGroup> {
     std::vector<LayoutColumn> choices;
     const auto menu_idx = idx;
 
@@ -83,12 +75,12 @@ auto Layout::make_menu(const std::vector<std::unique_ptr<Node>>& nodes, unsigned
     bool do_grouping = true;
     auto next = menu->first_child;
     while (do_grouping && next) {
-        if (const auto choice = dynamic_cast<NodeChoice *>(nodes.at(*next).get());
+        if (const auto *choice = dynamic_cast<NodeChoice*>(nodes.at(*next).get());
             choice->first_child && choice->after_block) {
             col_header_idxs.push_back(*next);
             LayoutColumn col(nodes, parent_idx, *next, choice);
             choices.emplace_back(std::move(col));
-        } else if (dynamic_cast<NodeMenu *>(nodes.at(*next).get())) {
+        } else if (dynamic_cast<NodeMenu*>(nodes.at(*next).get()) != nullptr) {
             do_grouping = false;
         }
         next = nodes.at(*next).get()->next;
@@ -96,24 +88,19 @@ auto Layout::make_menu(const std::vector<std::unique_ptr<Node>>& nodes, unsigned
 
     auto c_to_p =
         col_header_idxs
-        | std::views::transform([&](const unsigned& h_idx) {
+        | std::views::transform([&](const unsigned& h_idx) -> std::pair<Node*, Node*> {
             return std::pair{nodes.at(h_idx).get(), nodes.at(menu_idx).get()};
         })
-        | std::ranges::to<std::unordered_map<Node *, Node *>>();
-    // std::println("--------------------");
-    // for (const auto [child_ptr, parent_ptr] : c_to_p) {
-    //     std::println("{} points to menu {}", *child_ptr, *parent_ptr);
-    // }
-    // std::println("--------------------");
+        | std::ranges::to<std::unordered_map<Node*, Node*>>();
 
     return std::make_unique<LayoutGroup>(menu_idx, GroupType::Menu, std::move(choices), std::move(c_to_p));
 }
 
 auto Layout::make_label(const std::vector<std::unique_ptr<Node>>& nodes,
-                        unsigned idx, unsigned header_idx) -> std::unique_ptr<LayoutGroup> {
+                        const unsigned header_idx, const unsigned idx) -> std::unique_ptr<LayoutGroup> {
     const auto label_idx = idx;
 
-    const auto label = dynamic_cast<NodeLabel *>(nodes.at(idx).get());
+    const auto *label = dynamic_cast<NodeLabel*>(nodes.at(idx).get());
 
     std::vector<LayoutColumn> column;
     LayoutColumn col(nodes, header_idx, idx, label);
@@ -122,20 +109,20 @@ auto Layout::make_label(const std::vector<std::unique_ptr<Node>>& nodes,
     return std::make_unique<LayoutGroup>(label_idx, GroupType::Label, std::move(column));
 }
 
-void Layout::layout_node(LayoutBase& disp, int left_x, unsigned row) {
-    if (auto* group = dynamic_cast<LayoutGroup *>(&disp)) {
+void Layout::layout_node(LayoutBase& disp, const int left_x, const unsigned row) {
+    if (auto* group = dynamic_cast<LayoutGroup*>(&disp)) {
         layout_group(*group, left_x, row);
     } else {
-        disp.layout = {left_x, row, disp.width, disp.height};
+        disp.layout = {.left_x=left_x, .top_y=row, .w_units=disp.width, .h_units=disp.height};
     }
 }
 
-void Layout::layout_column(const LayoutColumn& col, int left_x, unsigned row) {
+void Layout::layout_column(const LayoutColumn& col, const int left_x, const unsigned row) {
     unsigned curr_row = row;
     for (auto& display : col.displays) {
         const int parent_center = left_x + static_cast<int>(col.center_offset);
 
-        if (const auto* g = dynamic_cast<LayoutGroup *>(display.get())) {
+        if (const auto* g = dynamic_cast<LayoutGroup*>(display.get())) {
             const int child_left = parent_center - g->anchor_x();
             layout_node(*display, child_left, curr_row);
         } else {
@@ -147,14 +134,13 @@ void Layout::layout_column(const LayoutColumn& col, int left_x, unsigned row) {
     }
 }
 
-void Layout::layout_group(LayoutGroup& group, int left_x, unsigned row) {
-    group.layout = {left_x, row, group.width, group.height};
+void Layout::layout_group(LayoutGroup& group, const int left_x, const unsigned row) {
+    group.layout = {.left_x=left_x, .top_y=row, .w_units=group.width, .h_units=group.height};
 
     int x_pos = left_x;
 
     for (auto& col : group.columns) {
         layout_column(col, x_pos, row);
-
         x_pos += col.width;
     }
 }
@@ -174,11 +160,11 @@ auto LayoutBase::update_height() -> unsigned {
     return 1;
 }
 
-void LayoutBase::flatten(std::vector<LayoutBase *>& flat_disps) {
+void LayoutBase::flatten(std::vector<LayoutBase*>& flat_disps) {
     flat_disps.push_back(this);
 }
 
-void LayoutBase::collect_edges(std::unordered_map<Node *, Node *>& edges) {
+void LayoutBase::collect_edges(std::unordered_map<Node*, Node*>& edges) {
 }
 
 auto LayoutBase::get_idx() const -> unsigned {
@@ -197,10 +183,9 @@ auto LayoutItem::get_pre_item() -> std::optional<unsigned> {
 }
 
 LayoutColumn::LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, const unsigned parent_idx,
-                           const unsigned first_node, NodeParent* parent_ptr)
+                           const unsigned first_node, const NodeParent* parent_ptr)
     : LayoutBase(parent_idx) {
     auto i = *parent_ptr->first_child;
-    // header_idx = parent_idx;
 
     this->displays.emplace_back(std::make_unique<LayoutItem>(first_node));
     std::optional<unsigned> prev_idx = first_node;
@@ -210,18 +195,18 @@ LayoutColumn::LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, cons
         std::unique_ptr<LayoutGroup> group_ptr = nullptr;
 
         if (n->has_children()) {
-            if (dynamic_cast<NodeIf *>(n.get())) {
-                this->displays.emplace_back(Layout::make_ifs(nodes, i, *prev_idx));
-            } else if (dynamic_cast<NodeMenu *>(n.get())) {
+            if (dynamic_cast<NodeIf*>(n.get())) {
+                this->displays.emplace_back(Layout::make_ifs(nodes, *prev_idx, i));
+            } else if (dynamic_cast<NodeMenu*>(n.get())) {
                 // ==============================================================
                 // kind of a hack, but necessary due to the way menus are grouped
                 this->displays.emplace_back(std::make_unique<LayoutItem>(i));
                 // ==============================================================
 
                 // then just do it like normal
-                this->displays.emplace_back(Layout::make_menu(nodes, i, *prev_idx));
-            } else if (dynamic_cast<NodeLabel *>(n.get())) {
-                this->displays.emplace_back(Layout::make_label(nodes, i, *prev_idx));
+                this->displays.emplace_back(Layout::make_menu(nodes, *prev_idx, i));
+            } else if (dynamic_cast<NodeLabel*>(n.get())) {
+                this->displays.emplace_back(Layout::make_label(nodes, *prev_idx, i));
             }
         } else {
             this->displays.emplace_back(std::make_unique<LayoutItem>(i));
@@ -244,17 +229,6 @@ auto LayoutColumn::has_children() -> bool {
     return true;
 }
 
-// auto LayoutColumn::update_width() -> unsigned {
-//     unsigned acc_width = 1;
-//
-//     for (const auto& node : displays) {
-//         acc_width = std::max(acc_width, node->update_width());
-//     }
-//
-//     // flat_disps.push_back(this);
-//     this->width = acc_width;
-//     return this->width;
-// }
 auto LayoutColumn::update_width() -> unsigned {
     unsigned left_extent  = 0;
     unsigned right_extent = 0;
@@ -288,13 +262,13 @@ auto LayoutColumn::update_height() -> unsigned {
     return this->height;
 }
 
-void LayoutColumn::flatten(std::vector<LayoutBase *>& flat_disps) {
+void LayoutColumn::flatten(std::vector<LayoutBase*>& flat_disps) {
     for (const auto& node : displays) {
         node->flatten(flat_disps);
     }
 }
 
-void LayoutColumn::collect_edges(std::unordered_map<Node *, Node *>& edges) {
+void LayoutColumn::collect_edges(std::unordered_map<Node*, Node*>& edges) {
     for (const auto& node : displays) {
         node->collect_edges(edges);
     }
@@ -304,8 +278,8 @@ LayoutGroup::LayoutGroup(const unsigned idx, const GroupType type, std::vector<L
     : LayoutBase(idx), type(type), columns(std::move(columns)), children_to_parents(std::move(c_to_p)) {
 }
 
-LayoutGroup::LayoutGroup(unsigned idx, GroupType type, std::vector<LayoutColumn> columns)
-    : LayoutBase(idx), type(type), columns(std::move(columns)), children_to_parents(std::unordered_map<Node*, Node*>()) {
+LayoutGroup::LayoutGroup(const unsigned idx, const GroupType type, std::vector<LayoutColumn> columns)
+    : LayoutBase(idx), type(type), columns(std::move(columns)) {
 
 }
 
@@ -331,11 +305,9 @@ auto LayoutGroup::update_width() -> unsigned {
     for (unsigned i = 0; i < columns.size(); ++i) {
         if (i < mid) {
             anchor_offset += columns.at(i).width;
-            // acc_width += columns.at(i).width;
         }
     }
 
-    // flat_disps.push_back(this);
     width = std::max(1u, acc_width);
     return width;
 }
@@ -349,13 +321,13 @@ auto LayoutGroup::update_height() -> unsigned {
     return height;
 }
 
-void LayoutGroup::flatten(std::vector<LayoutBase *>& flat_disps) {
+void LayoutGroup::flatten(std::vector<LayoutBase*>& flat_disps) {
     for (auto& col : columns) {
         col.flatten(flat_disps);
     }
 }
 
-void LayoutGroup::collect_edges(std::unordered_map<Node *, Node *>& edges) {
+void LayoutGroup::collect_edges(std::unordered_map<Node*, Node*>& edges) {
     edges.insert(children_to_parents.begin(), children_to_parents.end());
     for (auto& col : columns) {
         col.collect_edges(edges);
@@ -380,29 +352,34 @@ auto LayoutGroup::anchor_x() const -> int {
 }
 
 void GraphLayout::assign_dimensions() const {
-    for (const auto& group : groups) {
+    for (const auto& group : top_levels) {
         group->update_width();
         group->update_height();
     }
 }
 
-void GraphLayout::assign_layouts() const {
+void GraphLayout::assign_layouts() {
     unsigned y_pos = 0;
-    for (auto& group : groups) {
+    for (const auto& group : top_levels) {
         Layout::layout_node(*group, 0, y_pos);
-        y_pos += group->height + 1;
+        if (dynamic_cast<LayoutGroup*>(group.get())) {
+            y_pos += group->height + 1;
+        } else {
+            group->layout.left_x = get_max_width() / 2;
+            y_pos += 1;
+        }
     }
 }
 
 void GraphLayout::flatten() {
-    for (const auto& group : groups) {
+    for (const auto& group : top_levels) {
         group->flatten(flat_disps);
     }
 }
 
 auto GraphLayout::collect_edges() const -> std::unordered_map<Node*, Node*> {
     std::unordered_map<Node*, Node*> edges;
-    for (const auto &group : groups) {
+    for (const auto &group : top_levels) {
         group->collect_edges(edges);
     }
 
@@ -413,8 +390,10 @@ GraphLayout::GraphLayout(Graph& graph) {
     for (int i = 0; i < graph.get_nodes().size(); ++i) {
         const auto& n = graph.get_nodes().at(i);
         // TODO: make this *not* just assume labels are the roots
-        if (dynamic_cast<NodeLabel *>(n.get()) != nullptr) {
-            groups.emplace_back(Layout::make_label(graph.get_nodes(), i, i));
+        if (dynamic_cast<NodeLabel*>(n.get()) != nullptr) {
+            top_levels.emplace_back(Layout::make_label(graph.get_nodes(), i, i));
+        } else if (n->indent == 0){
+            top_levels.emplace_back(std::make_unique<LayoutItem>(i));
         }
     }
 
@@ -422,16 +401,27 @@ GraphLayout::GraphLayout(Graph& graph) {
     assign_layouts();
     flatten();
 
+    std::println("{} total display nodes, {} graph nodes.", flat_disps.size(), graph.get_nodes().size());
+    // std::println("====================");
+    // for (const auto &d : flat_disps) {
+    //     // std::println("{:p}", *graph.get_nodes().at(d->get_idx()));
+    // }
+    // std::println("====================");
+    // for (const auto &n : graph.get_nodes()) {
+    //     // std::println("{:p}", *n);
+    // }
+    // std::println("====================");
+
     assert(flat_disps.size() == graph.get_nodes().size());
 }
 
 auto GraphLayout::get_groups() -> std::vector<std::unique_ptr<LayoutBase>>& {
-    return groups;
+    return top_levels;
 }
 
 auto GraphLayout::get_max_width() -> unsigned {
     return std::ranges::max(
-        groups | std::views::transform(&LayoutGroup::width)
+        top_levels | std::views::transform(&LayoutGroup::width)
     );
 }
 
@@ -439,7 +429,7 @@ auto GraphLayout::make_displayables(Graph& graph) -> std::pair<std::vector<Displ
     std::vector<unsigned> idxs;
     auto displayables =
             flat_disps
-            | std::views::transform([&](const auto& ptr) {
+            | std::views::transform([&](const auto& ptr) -> auto {
                 auto idx = ptr->get_idx();
                 idxs.push_back(idx);
                 const auto& node = graph.get_nodes().at(idx);
@@ -449,10 +439,7 @@ auto GraphLayout::make_displayables(Graph& graph) -> std::pair<std::vector<Displ
                     DisplayNode::get_width(),
                     DisplayNode::get_height()
                 };
-                // disp_box.x *= 1.05;
-                // disp_box.y *= 1.05;
-                auto disp = node->make_display_node(disp_box);
-                return disp;
+                return node->make_display_node(disp_box);
             })
             | std::ranges::to<std::vector<DisplayNode>>();
 
@@ -461,6 +448,7 @@ auto GraphLayout::make_displayables(Graph& graph) -> std::pair<std::vector<Displ
         nodes_to_disps[graph.get_nodes().at(idxs.at(i)).get()] = &displayables.at(i);
     }
 
+#ifndef NDEBUG
     for (int i = 0; i < displayables.size(); ++i) {
         for (int j = 0; j < displayables.size(); ++j) {
             if (i != j) {
@@ -470,13 +458,14 @@ auto GraphLayout::make_displayables(Graph& graph) -> std::pair<std::vector<Displ
             }
         }
     }
+#endif //NDEBUG
 
-    std::vector<std::array<raylib::Vector2, 5>> line_points;
+    std::vector<std::array<raylib::Vector2, N_POINTS>> line_points;
 
     auto edges = collect_edges();
-    for (auto &[child, parent] : edges) {
-        auto child_disp = nodes_to_disps[child];
-        auto parent_disp = nodes_to_disps[parent];
+    for (auto &[child, parent] : collect_edges()) {
+        auto *child_disp = nodes_to_disps[child];
+        auto *parent_disp = nodes_to_disps[parent];
         auto child_x = child_disp->main_box.x + (child_disp->main_box.width / 2);
         auto child_y = child_disp->main_box.y;
         auto parent_x = parent_disp->main_box.x + (parent_disp->main_box.width / 2);
@@ -488,7 +477,6 @@ auto GraphLayout::make_displayables(Graph& graph) -> std::pair<std::vector<Displ
         raylib::Vector2 child_pt(child_x, child_y);
         raylib::Vector2 parent_pt(parent_x, parent_y);
         line_points.push_back({child_pt, child_up, middle, parent_down, parent_pt});
-        // std::println("{} -> {}", child_disp->to_string(), parent_disp->to_string());
     }
 
     return {std::move(displayables), std::move(line_points)};
