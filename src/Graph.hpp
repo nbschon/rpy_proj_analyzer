@@ -5,27 +5,14 @@
 #ifndef RPY_PROJ_ANALYZER_GRAPH_HPP
 #define RPY_PROJ_ANALYZER_GRAPH_HPP
 
+#include "Lexer.hpp"
 #include "Node.hpp"
 #include "Token.hpp"
 
 #include <expected>
-#include <format>
+#include <filesystem>
 #include <iostream>
 #include <print>
-#include <span>
-#include <type_traits>
-
-#define H_A(t, tok) std::holds_alternative<t>(tok)
-
-// template<class T, class... Us>
-// struct variant_has;
-//
-// template<class T, class... Us>
-// struct variant_has<T, std::variant<Us...>>
-//     : std::bool_constant<(std::is_same_v<T, Us> || ...)> {};
-//
-// template <class T>
-// concept InTokens = variant_has<T, std::remove_cvref_t<Token>>::value;
 
 class Graph {
     std::vector<std::unique_ptr<Node>> nodes;
@@ -34,6 +21,7 @@ class Graph {
     std::vector<std::string> errors;
     std::vector<Node*> nodes_w_expr;
     std::vector<Token> tokens;
+    Lexer lexer;
 
     unsigned idx = 0;
 
@@ -56,130 +44,12 @@ class Graph {
     Overload(Ts...) -> Overload<Ts...>;
 
     template<typename T>
-    requires InTokens<T>
-    [[nodiscard]] auto expect() -> std::expected<T, std::string> {
-        auto const& tok = tokens.at(idx);
-        if (std::holds_alternative<T>(tok)) {
-            return std::get<T>(tokens.at(idx++));
-        }
-
-        const std::string actual = std::visit([]<typename U>(U const& t) -> std::string {
-            return std::format("{} at {}", tok_name<std::decay_t<U>>(), tok_pos(t));
-        }, tok);
-        return std::unexpected(std::format("expected {}, got {}", tok_name<T>(), actual));
-    }
-
-    /**
-     * @brief returns a string containing the potential expected tokens, and the actual one.
-     *
-     * @tparam Ts all potential types that should've been encountered instead.
-     */
-    template<typename... Ts>
-    requires (InTokens<Ts> && ...)
-    [[nodiscard]] auto multi_tok_error(const std::vector<std::string_view> &other = {}) -> std::string {
-        std::vector<std::string_view> things;
-        ((things.push_back(tok_name<Ts>())), ...);
-
-        if (!other.empty()) {
-            for (const auto &o : other) {
-                things.push_back(o);
-            }
-        }
-
-        auto const &tok = tokens.at(idx);
-        const std::string actual = std::visit([]<typename V>(V const &t) -> std::string {
-            return std::format("{} at {}", tok_name<std::decay_t<V>>(), tok_pos(t));
-        }, tok);
-
-        std::string expected;
-        switch (things.size()) {
-            case 1:
-                expected = things.at(0);
-                break;
-            case 2:
-                expected = std::format("{} or {}", things.at(0), things.at(1));
-                break;
-            default:
-                for (int i = 0; i < things.size() - 1; i++) {
-                    expected += std::format("{}, ", things.at(i));
-                }
-                expected += std::format("or {}", things.back());
-                break;
-        }
-
-        return std::format("expected {}, got {}", expected, actual);
-    }
-
-    // the template argument is the token by which the expression slice is delimited.
-    // for most things, it's a newline, but for things that need a new indentation,
-    // it's a colon instead.
-    // template<typename T>
-    // requires InTokens<T>
-    // [[nodiscard]] auto expr_slice() -> std::expected<std::span<const Token>, std::string> {
-    //     std::string error_msg;
-    //
-    //     const std::size_t start_idx = idx;
-    //
-    //     while (idx < tokens.size() && !std::holds_alternative<T>(tokens.at(idx)) && error_msg.empty()) {
-    //         const auto& token = tokens.at(idx);
-    //         std::visit(
-    //             Overload {
-    //                 [&](const TokIdent&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokStrLit&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokIntLit&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokFloatLit&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokBoolLit&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokOp&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokLParen&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokRParen&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokComma&) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&](const TokNone) -> void {
-    //                     idx++;
-    //                 },
-    //                 [&]<typename U>(U&& other) -> void {
-    //                     using V = std::decay_t<U>;
-    //                     static_assert(std::is_base_of_v<Tok, V>, "expected derived from base Tok");
-    //                     const auto base_tok = static_cast<const Tok &>(other);
-    //                     error_msg = std::format("expected viable Expr token, got {} at {}", tok_name<V>(),
-    //                                             tok_pos(base_tok));
-    //                 },
-    //             }, token);
-    //     }
-    //
-    //     if (!error_msg.empty()) {
-    //         errors.push_back(error_msg);
-    //         return std::unexpected(error_msg);
-    //     }
-    //
-    //     const std::span all(tokens.data(), tokens.size());
-    //     return all.subspan(start_idx, idx - start_idx);
-    // }
-
-    template<typename T>
     [[nodiscard]] auto add_cond_node(const Tok& t)
         -> std::unique_ptr<Node> {
-        idx++;
+        ++lexer;
 
-        const auto expr = expr_slice(tokens, idx);
-        if (expr && std::holds_alternative<TokColon>(tokens.at(idx))) {
+        const auto expr = expr_slice(lexer);
+        if (expr && lexer.curr_is<TokColon>()) {
             return std::make_unique<T>(t, *expr);
         }
 
@@ -192,7 +62,7 @@ class Graph {
     void generate_nodes();
 
 public:
-    explicit Graph(std::vector<Token> tokens);
+    explicit Graph(const std::filesystem::path &path);
 
     auto get_nodes() -> std::vector<std::unique_ptr<Node>>&;
 

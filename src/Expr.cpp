@@ -4,6 +4,8 @@
 
 #include "Expr.hpp"
 
+#include "Lexer.hpp"
+
 #include <cassert>
 #include <format>
 #include <optional>
@@ -102,44 +104,43 @@ auto ExprCall::to_string() const -> std::string {
     return std::format("[Callee: {}, {}, {}]", callee_str, arg_str, kwarg_str);
 }
 
-auto expr_slice(const std::vector<Token> &tokens, unsigned &idx) -> std::expected<std::span<const Token>, std::string> {
-    std::string error_msg;
-    const std::size_t start_idx = idx;
+auto expr_slice(Lexer &lexer) -> std::expected<std::span<const Token>, std::string> {
+    const auto start_idx = lexer.get_idx();
 
     bool get_toks = true;
-    while (get_toks) {
-        const auto& token = tokens.at(idx);
+    while (get_toks && lexer.has_more()) {
+        const auto& token = lexer.curr();
         std::visit(
             Overload {
                 [&](const TokIdent&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokStrLit&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokIntLit&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokFloatLit&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokBoolLit&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokOp&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokLParen&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokRParen&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokComma&) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&](const TokNone) -> void {
-                    idx++;
+                    ++lexer;
                 },
                 [&]<typename U>(U&& other) -> void {
                     get_toks = false;
@@ -152,23 +153,18 @@ auto expr_slice(const std::vector<Token> &tokens, unsigned &idx) -> std::expecte
             }, token);
     }
 
-    if (!error_msg.empty()) {
-        return std::unexpected(error_msg);
-    }
-
-    if (start_idx == idx) {
+    const auto count = lexer.get_idx() - start_idx;
+    if (count == 0) {
         return std::unexpected(
-            std::format("failed to make span of valid Tokens at {}", tok_pos(tokens.at(idx))));
+            std::format("failed to make span of valid Tokens at {}", tok_pos(lexer.curr())));
     }
 
-    const std::span all(tokens.data(), tokens.size());
-    return all.subspan(start_idx, idx - start_idx);
+    const std::span all(lexer.get_tokens().data(), lexer.get_tokens().size());
+    return all.subspan(start_idx, count);
 }
 
-auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx) -> std::unique_ptr<ExprCall> {
-    // if (std::holds_alternative<TokLParen>(toks.front()) && std::holds_alternative<TokRParen>(toks.back())) {
-    //     std::println("good args!!!");
-    // }
+auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx)// -> std::unique_ptr<ExprCall> {
+-> std::expected<std::unique_ptr<ExprCall>, std::string> {
     auto idx = start_idx;
     int n_l = 0;
     while (idx < toks.size()) {
@@ -220,19 +216,27 @@ auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx) -> st
                 if (std::get<TokOp>(a[1]).type == OpType::Assign) {
                     unsigned e_start_idx = 2;
                     auto name = std::get<TokIdent>(a[0]).name;
-                    fn_kwargs.emplace_back(name, fold_into_expr(a, e_start_idx));
-                    continue;
+                    auto expr = fold_into_expr(a, e_start_idx);
+                    if (expr) {
+                        fn_kwargs.emplace_back(name, std::move(*expr));
+                        continue;
+                    }
+                    return std::unexpected(std::move(expr.error()));
                 }
 
-                std::println(std::cerr, "invalid kwarg format");
+                return std::unexpected("invalid kwarg format");
             }
         }
 
         if (a.empty()) {
-            std::println(std::cerr, "empty arg! bad!");
-        } else {
-            fn_args.emplace_back(fold_into_expr(a));
+            return std::unexpected("empty arg in expression");
         }
+
+        auto new_arg = fold_into_expr(a);
+        if (!new_arg) {
+            return std::unexpected(std::move(new_arg.error()));
+        }
+        fn_args.emplace_back(std::move(*new_arg));
     }
 
     return std::make_unique<ExprCall>(std::move(fn_args), std::move(fn_kwargs));
@@ -242,7 +246,8 @@ auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx) -> st
  * Adapted from here:
  * https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
  */
-auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_prec) -> std::unique_ptr<Expr> {
+auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_prec)
+-> std::expected<std::unique_ptr<Expr>, std::string> {
     auto peek = [&]() -> std::optional<const Token> {
         if (idx < toks.size()) {
             return toks[idx];
@@ -253,37 +258,47 @@ auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_p
         return toks[idx++];
     };
 
+    using Result = std::expected<std::unique_ptr<Expr>, std::string>;
+
     // TODO: graceful error reporting instead of crashing
     const auto lhs_tok = consume();
     auto lhs = std::visit(
         Overload{
-            [&](const TokIdent& t) -> std::unique_ptr<Expr> {
+            [&](const TokIdent& t) -> Result {
                 return std::make_unique<ExprVar>(t.name);
             },
-            [&](const TokStrLit& t) -> std::unique_ptr<Expr> {
+            [&](const TokStrLit& t) -> Result {
                 return std::make_unique<ExprLit>(t.text);
             },
-            [&](const TokIntLit& t) -> std::unique_ptr<Expr> {
+            [&](const TokIntLit& t) -> Result {
                 return std::make_unique<ExprLit>(t.value);
             },
-            [&](const TokFloatLit& t) -> std::unique_ptr<Expr> {
+            [&](const TokFloatLit& t) -> Result {
                 return std::make_unique<ExprLit>(t.value);
             },
-            [&](const TokBoolLit& t) -> std::unique_ptr<Expr> {
+            [&](const TokBoolLit& t) -> Result {
                 return std::make_unique<ExprLit>(t.value);
             },
-            [&](const TokLParen&) -> std::unique_ptr<Expr> {
+            [&](const TokLParen&) -> Result {
                 auto expr = fold_into_expr(toks, idx, 0.0f);
-                assert(std::holds_alternative<TokRParen>(*peek()));
-                consume();
-                return std::move(expr);
+
+                if (expr) {
+                    if (std::holds_alternative<TokRParen>(*peek())) {
+                        return std::unexpected(std::format("expected RParen at {}", tok_pos(*peek())));
+                    }
+                    consume();
+                    return expr;
+                }
+
+                return std::unexpected(expr.error());
             },
-            [&](const TokOp& t) -> std::unique_ptr<Expr> {
+            [&](const TokOp& t) -> Result {
                 auto [l_prec, r_prec] = precedence(t.type);
                 auto rhs = fold_into_expr(toks, idx, r_prec);
-                return std::make_unique<ExprUnary>(t.type, std::move(rhs));
+                return std::make_unique<ExprUnary>(t.type, std::move(*rhs));
             },
-            [&](auto&&) -> std::unique_ptr<Expr> {
+            [&](auto&&) -> Result {
+                return std::unexpected("bad token in expression");
                 std::println(std::cerr, "bad token in expression");
                 std::unreachable();
             },
@@ -295,9 +310,12 @@ auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_p
         }
 
         if (std::holds_alternative<TokLParen>(*peek())) {
-            auto call = split_inside_parens(toks, idx);
-            call->callee = std::move(lhs);
-            lhs = std::move(call);
+            if (auto call = split_inside_parens(toks, idx)) {
+                (*call)->callee = std::move(*lhs);
+                lhs = std::move(call);
+            } else {
+                return std::unexpected(std::move(call.error()));
+            }
         }
 
         if (std::holds_alternative<TokRParen>(*peek())) {
@@ -316,13 +334,33 @@ auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_p
         consume();
 
         if (const auto n_args = args(op); n_args == 1) {
-            lhs = std::make_unique<ExprUnary>(op, fold_into_expr(toks, idx, r_prec));
+            auto res = fold_into_expr(toks, idx, r_prec);
+            if (!res) {
+                return std::unexpected(res.error());
+            }
+            lhs = std::make_unique<ExprUnary>(op, std::move(*res));
         } else {
-            lhs = std::make_unique<ExprBinary>(std::move(lhs), op, fold_into_expr(toks, idx, r_prec));
+            auto rhs = fold_into_expr(toks, idx, r_prec);
+            if (!rhs) {
+                return std::unexpected(rhs.error());
+            }
+            lhs = std::make_unique<ExprBinary>(std::move(*lhs), op, std::move(*rhs));
         }
     }
 
     return lhs;
+}
+
+auto try_get_expr(Lexer& lexer) -> std::expected<std::unique_ptr<Expr>, std::string> {
+    auto slice = expr_slice(lexer);
+    if (slice) {
+        auto expr = fold_into_expr(*slice);
+        if (expr) {
+            return expr;
+        }
+        return std::unexpected(std::move(expr.error()));
+    }
+    return std::unexpected(std::move(slice.error()));
 }
 
 auto is_valid_assign(const Expr* expr) -> bool {

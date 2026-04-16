@@ -56,12 +56,12 @@ class ViewScreen final : public Screen {
     static constexpr float max_zoom = 2.0f;
 
     struct RenpyFile {
-        Lexer lexer;
+        // Lexer lexer;
         Graph graph;
         GraphLayout layout;
 
         explicit RenpyFile(const std::filesystem::path &path)
-            : lexer(path), graph(lexer.tokenize()), layout(graph) {
+            : graph(path), layout(graph) {
         }
     };
 

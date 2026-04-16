@@ -157,6 +157,8 @@ Lexer::Lexer(const std::filesystem::path &path) {
 
     if (input_str.empty()) {
         std::println(std::cerr, "Could not open file: {}", path.string());
+    } else {
+        tokenize();
     }
 }
 
@@ -363,6 +365,8 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokATLBlock{line, new_col, indent_level});
             } else if (txt_buff == "parallel") {
                 tokens.emplace_back(TokATLParallel{line, new_col, indent_level});
+            } else if (txt_buff == "choice") {
+                tokens.emplace_back(TokATLChoice{line, new_col, indent_level});
             } else if (txt_buff == "animation") {
                 tokens.emplace_back(TokATLAnimation{line, new_col, indent_level});
             } else if (txt_buff == "on") {
@@ -512,6 +516,25 @@ auto Lexer::tokenize() -> std::vector<Token> {
     return this->tokens;
 }
 
+auto Lexer::curr() const -> const Token& {
+    return tokens.at(idx);
+}
+
+void Lexer::adv() {
+    idx++;
+}
+
+auto Lexer::get_tokens() -> std::vector<Token>& {
+    return tokens;
+}
+
+auto Lexer::get_idx() const -> unsigned {
+    return idx;
+}
+
+auto Lexer::has_more() const -> bool {
+    return idx < tokens.size();
+}
 
 void Lexer::print_tokens(const unsigned n_lines) const {
     std::vector<unsigned> curr_line;
@@ -554,4 +577,25 @@ void Lexer::print_tokens(const unsigned n_lines) const {
             print_tok(tok);
         }
     }
+}
+
+auto Lexer::operator++() -> unsigned& {
+    idx++;
+    return idx;
+}
+
+auto Lexer::operator++(int) -> unsigned {
+    const auto old_idx = idx;
+    operator++();
+    return old_idx;
+}
+auto Lexer::operator--() -> unsigned& {
+    idx++;
+    return idx;
+}
+
+auto Lexer::operator--(int) -> unsigned {
+    const auto old_idx = idx;
+    operator++();
+    return old_idx;
 }

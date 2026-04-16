@@ -140,7 +140,7 @@ NodeWith::NodeWith(const Tok& token, std::span<const Token> expr_toks)
         out += std::format("{:cr} ", t);
         return out;
     })) {
-    trans = fold_into_expr(expr_toks);
+    trans = *fold_into_expr(expr_toks);
 }
 
 NodeWith::NodeWith(const Tok& token, const Transition& trans)
@@ -195,7 +195,7 @@ NodeChoice::NodeChoice(const Tok& token, std::string text, std::span<const Token
         out += std::format("{:r} ", t);
         return out;
     })) {
-    clause = fold_into_expr(expr_toks);
+    clause = *fold_into_expr(expr_toks);
 }
 
 auto NodeChoice::to_string() const -> std::string {
@@ -258,7 +258,7 @@ NodeExpr::NodeExpr(const Tok& token, const std::span<const Token> expr_toks)
           out += std::format("{:cr} ", t);
           return out;
       })) {
-    expr = fold_into_expr(expr_toks);
+    expr = *fold_into_expr(expr_toks);
     if (is_valid_assign(expr.get())) {
         type = DeclareType::Python;
     } else {
@@ -352,7 +352,7 @@ NodeIf::NodeIf(const Tok& token, const std::span<const Token> expr_toks)
           out += std::format("{:cr} ", t);
           return out;
       })) {
-    expr = fold_into_expr(expr_toks);
+    expr = *fold_into_expr(expr_toks);
 }
 
 auto NodeIf::to_string() const -> std::string {
@@ -373,7 +373,7 @@ NodeElif::NodeElif(const Tok& token, const std::span<const Token> expr_toks)
           out += std::format("{:cr} ", t);
           return out;
       })) {
-    expr = fold_into_expr(expr_toks);
+    expr = *fold_into_expr(expr_toks);
 }
 
 auto NodeElif::to_string() const -> std::string {
@@ -409,7 +409,7 @@ NodeWhile::NodeWhile(const Tok& token, const std::span<const Token> expr_toks)
               "{:cr} ", t);
           return out;
       })) {
-    expr = fold_into_expr(expr_toks);
+    expr = *fold_into_expr(expr_toks);
 }
 
 auto NodeWhile::to_string() const -> std::string {
@@ -439,7 +439,7 @@ NodeReturn::NodeReturn(const Tok& token, const std::span<const Token> expr_toks)
               "{:cr} ", t);
           return out;
       })) {
-    expr = fold_into_expr(expr_toks);
+    expr = *fold_into_expr(expr_toks);
 }
 
 auto NodeReturn::to_string() const -> std::string {

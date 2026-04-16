@@ -8,160 +8,176 @@
 #include <print>
 #include <utility>
 
-auto ATL::make_inline_interp(const std::vector<Token>& tokens, unsigned& idx, std::optional<Warper> warper)
+#include "Lexer.hpp"
+
+auto ATL::make_inline_interp(Lexer& lexer, std::optional<Warper> warper)
     -> std::expected<std::pair<std::vector<ATLProperty>, std::vector<std::unique_ptr<Expr>>>, std::string> {
     std::unique_ptr<Expr> expr = nullptr;
-    const auto init_idx = idx;
 
     std::vector<ATLProperty> properties;
-    while (std::holds_alternative<TokATLProperty>(tokens.at(idx))) {
-        const auto prop = std::get<TokATLProperty>(tokens.at(idx));
-        idx++;
-        if (auto slice = expr_slice(tokens, idx)) {
-            if (auto e = fold_into_expr(*slice)) {
-                properties.emplace_back(ATLProperty{.prop = prop.type, .value = std::move(e)});
-            } else {
-                // auto err = std::format("invalid expression at {}", tok_pos(prop));
-                // std::println(std::cerr, "{}", err);
-                return std::unexpected(std::format("invalid expression at {}", tok_pos(prop)));
-            }
+    while (lexer.curr_is<TokATLProperty>()) {
+        const auto prop = lexer.expect<TokATLProperty>();
+        // if (auto slice = expr_slice(lexer)) {
+        //     if (auto e = fold_into_expr(*slice)) {
+        //         properties.emplace_back(ATLProperty{.prop = prop->type, .value = std::move(e)});
+        //     } else {
+        //         return std::unexpected(std::format("invalid expression at {}", tok_pos(*prop)));
+        //     }
+        if (auto e = try_get_expr(lexer)) {
+            properties.emplace_back(ATLProperty{.prop = prop->type, .value = std::move(*e)});
         } else {
-            return std::unexpected(std::move(slice.error()));
+            return std::unexpected(std::move(e.error()));
         }
     }
 
     std::string err_msg;
     std::vector<std::unique_ptr<Expr>> knots;
     auto type = RotationType::None;
-    std::optional<int> circles;
+    std::unique_ptr<Expr> circles;
 
-    while (!std::holds_alternative<TokNewline>(tokens.at(idx))) {
+    while (lexer.curr_is_not<TokNewline>()) {
+        const auto &token = lexer.curr();
         std::visit(
             Overload{
                 [&](const TokATLKnot &t) -> void {
-                    while (std::holds_alternative<TokATLKnot>(tokens.at(idx))) {
-                        idx++;
-                        if (auto slice = expr_slice(tokens, idx)) {
-                            if (auto e = fold_into_expr(*slice)) {
-                                knots.emplace_back(std::move(e));
-                            } else {
-                                // auto err = std::format("invalid expression at {}", tok_pos(prop));
-                                // std::println(std::cerr, "{}", err);
-                                err_msg = std::format("invalid expression at {}", tok_pos(t));
-                            }
+                    while (lexer.curr_is<TokATLKnot>()) {
+                        ++lexer;
+                        // if (auto slice = expr_slice(lexer)) {
+                        //     if (auto e = fold_into_expr(*slice)) {
+                        //         knots.emplace_back(std::move(e));
+                        //     } else {
+                        //         err_msg = std::format("invalid expression at {}", tok_pos(t));
+                        //     }
+                        if (auto e = try_get_expr(lexer)) {
+                            knots.emplace_back(std::move(*e));
                         } else {
-                            err_msg = std::move(slice.error());
+                            err_msg = std::move(e.error());
                         }
                     }
                 },
                 [&](const TokATLClockwise &) -> void {
-                    idx++;
+                    ++lexer;
                     type = RotationType::Clockwise;
                 },
                 [&](const TokATLCCWise &) -> void {
-                    idx++;
+                    ++lexer;
                     type = RotationType::CCWise;
                 },
                 [&](const TokATLCircles &t) -> void {
-                    idx++;
-                    if (std::holds_alternative<TokIntLit>(tokens.at(idx))) {
-                        const auto int_tok = std::get<TokIntLit>(tokens.at(idx));
-                        idx++;
-                        circles = int_tok.value;
+                    ++lexer;
+                    // if (auto slice = expr_slice(lexer)) {
+                    //     if (auto e = fold_into_expr(*slice)) {
+                    //         circles = std::move(e);
+                    //     } else {
+                    //         err_msg = std::format("invalid expression at {}", tok_pos(t));
+                    //     }
+                    if (auto e = try_get_expr(lexer)) {
+                        circles = std::move(*e);
                     } else {
-                        err_msg = std::format("expected Integer Literal at {}", tok_pos(t));
+                        err_msg = std::move(e.error());
                     }
                 },
                 [&]<typename U>(U&& other) -> void {
                     using To = std::decay_t<U>;
                     err_msg = std::format("unexpected token {} at {}", tok_name<To>(), tok_pos(other));
                 },
-            }, tokens.at(idx));
+            }, token);
 
         if (!err_msg.empty()) {
             return std::unexpected(std::move(err_msg));
         }
-        idx++;
+        ++lexer;
     }
 
     return std::make_pair(std::move(properties), std::move(knots));
 }
 
-auto ATL::make_interp_block(const std::vector<Token>& tokens, unsigned& idx, std::optional<Warper> warper)
+auto ATL::make_interp_block(Lexer& lexer, std::optional<Warper> warper)
     -> std::expected<std::vector<ATLProperty>, std::string> {
     std::vector<ATLProperty> properties;
-    while (std::holds_alternative<TokATLProperty>(tokens.at(idx))) {
-        const auto prop = std::get<TokATLProperty>(tokens.at(idx));
-        idx++;
-        if (auto slice = expr_slice(tokens, idx)) {
-            if (auto e = fold_into_expr(*slice)) {
-                properties.emplace_back(prop.type, std::move(e));
-            } else {
-                return std::unexpected(std::format("invalid expression at {}", tok_pos(prop)));
-            }
+    while (lexer.curr_is<TokATLProperty>()) {
+        const auto prop = lexer.expect<TokATLProperty>();
+        // if (auto slice = expr_slice(lexer)) {
+        //     if (auto e = fold_into_expr(*slice)) {
+        //         properties.emplace_back(prop->type, std::move(e));
+        //     } else {
+        //         return std::unexpected(std::format("invalid expression at {}", tok_pos(*prop)));
+        //     }
+        // }
+        if (auto expr = try_get_expr(lexer)) {
+            properties.emplace_back(prop->type, std::move(*expr));
+        } else {
+            return std::unexpected(std::move(expr.error()));
         }
 
-        while (std::holds_alternative<TokTab>(tokens.at(idx)) || std::holds_alternative<TokNewline>(tokens.at(idx))) {
-            idx++;
+        while (lexer.curr_is<TokNewline, TokTab>()) {
+            ++lexer;
         }
     }
     return properties;
 }
 
-auto ATL::make_atl_block(const std::vector<Token>& tokens, unsigned& idx, unsigned indent) -> std::vector<ATLStmt> {
+auto ATL::make_atl_block(Lexer& lexer, unsigned indent) -> std::vector<ATLStmt> {
     std::vector<ATLStmt> statements;
 
-    while (tok_indent(tokens.at(idx)) > indent && idx < tokens.size()) {
+    while (tok_indent(lexer.curr()) > indent && lexer.has_more()) {
+        const auto &token = lexer.curr();
         std::visit(
             Overload{
                 [&](const TokATLProperty& t) {
-                    idx++;
-                    if (auto slice = expr_slice(tokens, idx)) {
-                        if (auto expr = fold_into_expr(*slice)) {
-                            statements.emplace_back(ATLProperty{t.type, std::move(expr)});
-                        } else {
-                            std::println(std::cerr, "invalid expression at {}", tok_pos(t));
-                        }
+                    ++lexer;
+                    // if (auto slice = expr_slice(lexer)) {
+                    //     if (auto expr = fold_into_expr(*slice)) {
+                    //         statements.emplace_back(ATLProperty{.prop=t.type, .value=std::move(expr)});
+                    //     } else {
+                    //         std::println(std::cerr, "invalid expression at {}", tok_pos(t));
+                    //     }
+                    if (auto expr = try_get_expr(lexer)) {
+                        statements.emplace_back(ATLProperty{.prop=t.type, .value=std::move(*expr)});
                     } else {
-                        std::println(std::cerr, "{}", slice.error());
+                        std::println(std::cerr, "{}", expr.error());
                     }
                 },
                 [&](const TokFloatLit& t) {
-                    idx++;
+                    ++lexer;
                     statements.emplace_back(ATLNumber{std::make_unique<ExprLit>(t.value)});
                 },
                 [&](const TokIntLit& t) {
-                    idx++;
+                    ++lexer;
                     statements.emplace_back(ATLNumber{std::make_unique<ExprLit>(t.value)});
                 },
                 [&](const TokATLPause& t) {
-                    idx++;
-                    if (const auto slice = expr_slice(tokens, idx)) {
-                        if (auto expr = fold_into_expr(*slice)) {
-                            statements.emplace_back(ATLNumber{std::move(expr)});
-                        } else {
-                            std::println(std::cerr, "invalid expression at {}", tok_pos(t));
-                        }
+                    ++lexer;
+                    // if (const auto slice = expr_slice(lexer)) {
+                    //     if (auto expr = fold_into_expr(*slice)) {
+                    //         statements.emplace_back(ATLNumber{std::move(expr)});
+                    //     } else {
+                    //         std::println(std::cerr, "invalid expression at {}", tok_pos(t));
+                    //     }
+                    if (auto expr = try_get_expr(lexer)) {
+                        statements.emplace_back(ATLNumber{std::move(*expr)});
                     } else {
-                        std::println(std::cerr, "{}", slice.error());
+                        std::println(std::cerr, "{}", expr.error());
                     }
                 },
                 [&](const TokATLWarper& t) {
-                    idx++;
+                    ++lexer;
                     std::unique_ptr<Expr> expr = nullptr;
-                    if (const auto slice = expr_slice(tokens, idx)) {
-                        if (auto e = fold_into_expr(*slice)) {
-                            expr = std::move(e);
-                        } else {
-                            auto err = std::format("invalid expression at {}", tok_pos(t));
-                            std::println(std::cerr, "{}", err);
-                        }
+                    // if (const auto slice = expr_slice(lexer)) {
+                    //     if (auto e = fold_into_expr(*slice)) {
+                    //         expr = std::move(e);
+                    //     } else {
+                    //         auto err = std::format("invalid expression at {}", tok_pos(t));
+                    //         std::println(std::cerr, "{}", err);
+                    //     }
+                    if (auto e = try_get_expr(lexer)) {
+                        expr = std::move(*e);
                     } else {
-                        std::println(std::cerr, "{}", slice.error());
+                        std::println(std::cerr, "{}", e.error());
                     }
 
-                    if (std::holds_alternative<TokColon>(tokens.at(idx))) {
-                        if (auto props_knots = make_inline_interp(tokens, idx, t.warper)) {
+                    if (lexer.curr_is<TokColon>()) {
+                        if (auto props_knots = make_inline_interp(lexer, t.warper)) {
                             statements.emplace_back(ATLInterp{
                                 .warper = std::make_unique<ExprLit>(warper_str(t.warper)),
                                 .value = std::move(expr),
@@ -171,8 +187,8 @@ auto ATL::make_atl_block(const std::vector<Token>& tokens, unsigned& idx, unsign
                         } else {
                             std::println(std::cerr, "{}", props_knots.error());
                         }
-                    } else if (std::holds_alternative<TokATLProperty>(tokens.at(idx))) {
-                        if (auto prop_block = make_interp_block(tokens, idx, t.warper)) {
+                    } else if (lexer.curr_is<TokATLProperty>()) {
+                        if (auto prop_block = make_interp_block(lexer, t.warper)) {
                             statements.emplace_back(ATLInterp{
                                 .warper = std::make_unique<ExprLit>(warper_str(t.warper)),
                                 .value = std::move(expr),
@@ -187,36 +203,40 @@ auto ATL::make_atl_block(const std::vector<Token>& tokens, unsigned& idx, unsign
                     }
                 },
                 [&](const TokATLWarp& t) {
-                    idx++;
+                    ++lexer;
                     std::unique_ptr<Expr> warper_func = nullptr;
-                    if (const auto slice = expr_slice(tokens, idx)) {
-                        if (auto e = fold_into_expr(*slice)) {
-                            warper_func = std::move(e);
-                        } else {
-                            auto err = std::format("invalid expression at {}", tok_pos(t));
-                            std::println(std::cerr, "{}", err);
-                            // return std::unexpected(
-                            //     std::format("invalid expression at {}", tok_pos(t)));
-                        }
+                    // if (const auto slice = expr_slice(lexer)) {
+                    //     if (auto e = fold_into_expr(*slice)) {
+                    //         warper_func = std::move(e);
+                    //     } else {
+                    //         auto err = std::format("invalid expression at {}", tok_pos(t));
+                    //         std::println(std::cerr, "{}", err);
+                    //         // return std::unexpected(
+                    //         //     std::format("invalid expression at {}", tok_pos(t)));
+                    //     }
+                    if (auto expr = try_get_expr(lexer)) {
+                        warper_func = std::move(*expr);
                     } else {
-                        std::println(std::cerr, "{}", slice.error());
+                        std::println(std::cerr, "{}", expr.error());
                     }
 
                     std::unique_ptr<Expr> expr = nullptr;
-                    if (const auto slice = expr_slice(tokens, idx)) {
-                        if (auto e = fold_into_expr(*slice)) {
-                            expr = std::move(e);
-                        } else {
-                            auto err = std::format("invalid expression at {}", tok_pos(t));
-                            std::println(std::cerr, "{}", err);
-                            // return std::unexpected(
-                            //     std::format("invalid expression at {}", tok_pos(tokens.at(init_idx))));
-                        }
+                    // if (const auto slice = expr_slice(lexer)) {
+                    //     if (auto e = fold_into_expr(*slice)) {
+                    //         expr = std::move(e);
+                    //     } else {
+                    //         auto err = std::format("invalid expression at {}", tok_pos(t));
+                    //         std::println(std::cerr, "{}", err);
+                    //         // return std::unexpected(
+                    //         //     std::format("invalid expression at {}", tok_pos(tokens.at(init_idx))));
+                    //     }
+                    if (auto e = try_get_expr(lexer)) {
+                        expr = std::move(*e);
                     } else {
-                        std::println(std::cerr, "{}", slice.error());
+                        std::println(std::cerr, "{}", e.error());
                     }
 
-                    if (auto props_knots = make_inline_interp(tokens, idx)) {
+                    if (auto props_knots = make_inline_interp(lexer)) {
                         statements.emplace_back(ATLInterp{
                             .warper = std::move(warper_func),
                             .value = std::move(expr),
@@ -227,19 +247,66 @@ auto ATL::make_atl_block(const std::vector<Token>& tokens, unsigned& idx, unsign
                         std::println(std::cerr, "{}", props_knots.error());
                     }
                 },
+                [&](const TokPass& t) {
+                    ++lexer;
+                    statements.emplace_back(ATLPass{});
+                },
+                [&](const TokATLRepeat& t) {
+                    ++lexer;
+                    // if (auto slice = expr_slice(lexer)) {
+                    //     if (auto e = fold_into_expr(*slice)) {
+                    //         statements.emplace_back(ATLRepeat{std::move(e)});
+                    //     } else {
+                    //         std::println(std::cerr, "invalid expression at {}", tok_pos(t));
+                    //     }
+                    if (auto expr = try_get_expr(lexer)) {
+                        statements.emplace_back(ATLRepeat{std::move(*expr)});
+                    } else {
+                        std::println(std::cerr, "{}", expr.error());
+                    }
+                },
+                [&](const TokATLBlock& t) {
+                    ++lexer;
+                    auto block = make_atl_block(lexer, indent + 1);
+                    statements.emplace_back(ATLBlock{std::move(block)});
+                },
+                [&](const TokATLParallel& t) {
+                    ++lexer;
+                    auto block = make_atl_block(lexer, indent + 1);
+                    statements.emplace_back(ATLParallel{std::move(block)});
+                },
+                [&](const TokATLChoice &t) {
+                    ++lexer;
+                    std::unique_ptr<Expr> expr = nullptr;
+                    // if (const auto slice = expr_slice(lexer)) {
+                    //     if (auto e = fold_into_expr(*slice)) {
+                    //         if (const auto colon = lexer.expect<TokColon>()) {
+                    //             expr = std::move(e);
+                    //         }
+                    //     }
+                    if (auto e = try_get_expr(lexer)) {
+
+                    } else {
+                        std::println(std::cerr, "{}", e.error());
+                    }
+                },
                 [&]<typename U>(U&& other) {
-                    if (const auto slice = expr_slice(tokens, idx)) {
-                        if (auto expr = fold_into_expr(*slice)) {
-                            statements.emplace_back(ATLNumber{std::move(expr)});
-                            return;
-                        }
+                    // if (const auto slice = expr_slice(lexer)) {
+                    //     if (auto expr = fold_into_expr(*slice)) {
+                    //         statements.emplace_back(ATLNumber{std::move(expr)});
+                    //         return;
+                    //     }
+                    // }
+                    if (auto expr = try_get_expr(lexer)) {
+                        statements.emplace_back(ATLNumber{std::move(*expr)});
+                        return;
                     }
                     using To = std::decay_t<U>;
                     static_assert(std::is_base_of_v<Tok, To>, "expected derived from base Tok");
                     std::string msg = std::format("unexpected token {} at {}", tok_name<To>(), tok_pos(other));
                     std::println(std::cerr, "{}", msg);
                 },
-            }, tokens.at(idx));
+            }, token);
     }
 
     return statements;

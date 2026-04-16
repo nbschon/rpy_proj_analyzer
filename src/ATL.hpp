@@ -17,6 +17,8 @@
 #include <variant>
 #include <vector>
 
+class Lexer;
+
 /*
  * Transformation property information borrowed from here:
  * https://www.renpy.org/doc/html/transform_properties.html
@@ -198,7 +200,7 @@ struct ATLInterp {
     std::unique_ptr<Expr> value;
     std::vector<ATLProperty> properties;
     std::vector<std::unique_ptr<Expr>> knots;
-    std::optional<int> circles;
+    std::unique_ptr<Expr> circles;
     RotationType rot_type;
 };
 
@@ -271,14 +273,14 @@ class ATL {
     Overload(Ts...) -> Overload<Ts...>;
 
     // really ugly return value but that's alright
-    static auto make_inline_interp(const std::vector<Token> &tokens, unsigned &idx, std::optional<Warper> warper = std::nullopt)
+    static auto make_inline_interp(Lexer& lexer, std::optional<Warper> warper = std::nullopt)
         -> std::expected<std::pair<std::vector<ATLProperty>, std::vector<std::unique_ptr<Expr>>>, std::string>;
 
-    static auto make_interp_block(const std::vector<Token> &tokens, unsigned &idx, std::optional<Warper> warper = std::nullopt)
+    static auto make_interp_block(Lexer& lexer, std::optional<Warper> warper = std::nullopt)
         -> std::expected<std::vector<ATLProperty>, std::string>;
 
 public:
-    static auto make_atl_block(const std::vector<Token> &tokens, unsigned &idx, unsigned indent) -> std::vector<ATLStmt>;
+    static auto make_atl_block(Lexer& lexer, unsigned indent) -> std::vector<ATLStmt>;
     static auto get_trans(const std::string_view &str) -> Transition;
     static auto get_warper(const std::string_view &str) -> Warper;
     static auto get_prop(const std::string_view &str) -> TFProp;

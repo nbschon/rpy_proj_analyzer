@@ -130,7 +130,7 @@ auto App::run_no_gui() -> int {
         Lexer lexer(*ArgVParser::path);
         const auto tokens = lexer.tokenize();
         lexer.print_tokens();
-        Graph graph(tokens);
+        Graph graph(*ArgVParser::path);
         return 0;
     }
 

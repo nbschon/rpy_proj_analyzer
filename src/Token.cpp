@@ -53,9 +53,6 @@ auto raw_str(const Token &tok) -> std::string {
             [&](const TokMenu &) -> std::string {
                 return "menu";
             },
-            [&](const TokChoice &) -> std::string {
-                return "ch";
-            },
             [&](const TokAt &) -> std::string {
                 return "at";
             },
@@ -173,6 +170,9 @@ auto raw_str(const Token &tok) -> std::string {
             [&](const TokATLParallel &) -> std::string {
                 return "parallel";
             },
+            [&](const TokATLChoice &) -> std::string {
+                return "choice";
+            },
             [&](const TokATLAnimation &) -> std::string {
                 return "animation";
             },
@@ -251,9 +251,6 @@ auto tok_str(const Token& token) -> std::string {
            },
            [&](const TokNone &) -> void {
                ret += "None";
-           },
-           [&](const TokChoice &) -> void {
-               ret += "Choice";
            },
            [&](const TokWith &) -> void {
                ret += "Transition";
@@ -372,7 +369,10 @@ auto tok_str(const Token& token) -> std::string {
            [&](const TokATLParallel &) -> void {
                ret += "ATL Parallel";
            },
-           [&](const TokATLAnimation &) -> void {
+            [&](const TokATLChoice &) -> void {
+                ret += "Choice";
+            },
+            [&](const TokATLAnimation &) -> void {
                ret += "ATL Animation";
            },
            [&](const TokATLOn &) -> void {
@@ -480,9 +480,6 @@ auto tok_color(const Token &token) -> std::uint32_t {
                 return blue;
             },
             [&](const TokMenu &) -> std::uint32_t {
-                return green;
-            },
-            [&](const TokChoice &) -> std::uint32_t {
                 return green;
             },
             [&](const TokAs &) -> std::uint32_t {
@@ -600,6 +597,9 @@ auto tok_color(const Token &token) -> std::uint32_t {
                 return green;
             },
             [&](const TokATLParallel &) -> std::uint32_t {
+                return green;
+            },
+            [&](const TokATLChoice &) -> std::uint32_t {
                 return green;
             },
             [&](const TokATLAnimation &) -> std::uint32_t {

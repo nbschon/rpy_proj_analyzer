@@ -104,10 +104,6 @@ struct TokMenu : Tok {
     static constexpr std::string_view type_name = "Menu";
 };
 
-struct TokChoice : Tok {
-    static constexpr std::string_view type_name = "Choice";
-};
-
 struct TokWith : Tok {
     static constexpr std::string_view type_name = "Transition";
 };
@@ -277,6 +273,10 @@ struct TokATLParallel : Tok {
     static constexpr std::string_view type_name = "ATLParallel";
 };
 
+struct TokATLChoice : Tok {
+    static constexpr std::string_view type_name = "ATLChoice";
+};
+
 struct TokATLAnimation : Tok {
     static constexpr std::string_view type_name = "ATLAnimation";
 };
@@ -335,7 +335,7 @@ using Token = std::variant<
     TokScene,
     TokNone,
     TokMenu,
-    TokChoice,
+    TokATLChoice,
     TokAs,
     TokAt,
     TokBehind,
