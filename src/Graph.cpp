@@ -122,7 +122,7 @@ auto Graph::assign_scores(const unsigned idx, double curr_score, const OpType op
     return best;
 }
 
-auto Graph::add_show_node(const Tok& t, bool is_scene) -> std::unique_ptr<Node> {
+auto Graph::add_show_node(const Tok& t, bool& has_atl, bool is_scene) -> std::unique_ptr<NodeShow> {
     std::string name;
     std::vector<std::string> attrs;
     ShowProps props{};
@@ -136,8 +136,8 @@ auto Graph::add_show_node(const Tok& t, bool is_scene) -> std::unique_ptr<Node> 
     }
 
     while (lexer.curr_is<TokIdent>()) {
-        auto attr = lexer.expect<TokIdent>();
         // because we're already inside the loop, we already know this is valid
+        auto attr = lexer.expect<TokIdent>();
         attrs.push_back(attr->name);
     }
 
@@ -205,7 +205,8 @@ auto Graph::add_show_node(const Tok& t, bool is_scene) -> std::unique_ptr<Node> 
             ++lexer;
         }
 
-        ATL::make_atl_block(lexer, colon->indent);
+        props.atl_stmts = ATL::make_atl_block(lexer, colon->indent);
+        has_atl = true;
     }
 
     // this is a bit of a hack, should probably be changed in the future
@@ -219,332 +220,339 @@ auto Graph::add_show_node(const Tok& t, bool is_scene) -> std::unique_ptr<Node> 
 void Graph::generate_nodes() {
     while (lexer.has_more()) {
         const auto& token = lexer.curr();
-        std::visit(
-            Overload{
-                [&](const TokDollarSign& t) {
-                    ++lexer;
-                    if (auto slice = expr_slice(lexer)) {
-                        nodes.push_back(std::make_unique<NodeExpr>(t, *slice));
-                        nodes_w_expr.push_back(nodes.back().get());
+        std::visit(Overload {
+            [&](const TokDollarSign& t) {
+                ++lexer;
+                if (auto slice = expr_slice(lexer)) {
+                    nodes.push_back(std::make_unique<NodeExpr>(t, *slice));
+                    nodes_w_expr.push_back(nodes.back().get());
+                } else {
+                    errors.push_back(std::move(slice.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokShow& t) {
+                ++lexer;
+                bool has_atl = false;
+                if (auto show_node = add_show_node(t, has_atl)) {
+                    nodes.push_back(std::move(show_node));
+                }
+                if (has_atl) {
+                    nodes_w_atl.push_back(nodes.back().get());
+                }
+            },
+            [&](const TokScene& t) {
+                ++lexer;
+                bool has_atl = false;
+                if (auto scene_node = add_show_node(t, has_atl, true)) {
+                    nodes.push_back(std::move(scene_node));
+                }
+                if (has_atl) {
+                    nodes_w_atl.push_back(nodes.back().get());
+                }
+            },
+            [&](const TokHide& t) {
+                ++lexer;
+                std::string name;
+                std::optional<std::string> onlayer;
+                if (auto char_name = lexer.expect<TokIdent>()) {
+                    name = char_name->name;
+                } else {
+                    errors.push_back(std::move(char_name.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return;
+                }
+
+                if (const auto onlayer_tok = lexer.expect<TokOnlayer>()) {
+                    if (auto layer = lexer.expect<TokIdent>()) {
+                        onlayer = layer->name;
                     } else {
-                        errors.push_back(std::move(slice.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokShow& t) {
-                    ++lexer;
-                    if (auto show_node = add_show_node(t)) {
-                        nodes.push_back(std::move(show_node));
-                    }
-                },
-                [&](const TokScene& t) {
-                    ++lexer;
-                    if (auto scene_node = add_show_node(t, true)) {
-                        nodes.push_back(std::move(scene_node));
-                    }
-                },
-                [&](const TokHide& t) {
-                    ++lexer;
-                    std::string name;
-                    std::optional<std::string> onlayer;
-                    if (auto char_name = lexer.expect<TokIdent>()) {
-                        name = char_name->name;
-                    } else {
-                        errors.push_back(std::move(char_name.error()));
-                        std::println(std::cerr, "{}", errors.back());
+                        errors.push_back(std::move(layer.error()));
+                        std::println(std::cerr, "{}", errors.back()) ;
                         return;
                     }
+                }
 
-                    if (const auto onlayer_tok = lexer.expect<TokOnlayer>()) {
-                        if (auto layer = lexer.expect<TokIdent>()) {
-                            onlayer = layer->name;
-                        } else {
-                            errors.push_back(std::move(layer.error()));
-                            std::println(std::cerr, "{}", errors.back()) ;
-                            return;
-                        }
-                    }
+                // same hack as in `add_show_node`. should probably be changed.
+                if (lexer.curr_is<TokWith>()) {
+                    --lexer;
+                }
 
-                    // same hack as above. should probably be changed.
-                    if (lexer.curr_is<TokWith>()) {
-                        --lexer;
-                    }
+                nodes.emplace_back(std::make_unique<NodeHide>(t, name, onlayer));
+            },
+            [&](const TokWith& t) {
+                ++lexer;
+                if (auto trans = lexer.expect<TokATLTransition>()) {
+                    nodes.push_back(std::make_unique<NodeWith>(t, trans->trans));
+                } else if (auto slice = expr_slice(lexer)) {
+                    nodes.push_back(std::make_unique<NodeWith>(t, *slice));
+                } else {
+                    errors.push_back(lexer.multi_tok_error<TokATLTransition>({"valid expression"}));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokMenu& t) {
+                ++lexer;
+                std::optional<std::string> set = std::nullopt;
+                std::optional<std::string> text;
+                if (auto colon = lexer.expect<TokColon>(); !colon) {
+                    errors.push_back(std::move(colon.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return;
+                }
 
-                    nodes.emplace_back(std::make_unique<NodeHide>(t, name, onlayer));
-                },
-                [&](const TokWith& t) {
+                while (lexer.curr_is<TokNewline, TokTab>()) {
                     ++lexer;
-                    if (auto trans = lexer.expect<TokATLTransition>()) {
-                        nodes.push_back(std::make_unique<NodeWith>(t, trans->trans));
-                    } else if (auto slice = expr_slice(lexer)) {
-                        nodes.push_back(std::make_unique<NodeWith>(t, *slice));
+                }
+
+                if (const auto set_tok = lexer.expect<TokIdent>(); set_tok->name == "set") {
+                    if (auto ident = lexer.expect<TokIdent>();
+                        ident && set_tok->indent == t.indent + 1) {
+                        set = ident->name;
+                        while (lexer.curr_is_not<TokNewline, TokTab>()) {
+                            ++lexer;
+                        }
                     } else {
-                        errors.push_back(lexer.multi_tok_error<TokATLTransition>({"valid expression"}));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokMenu& t) {
-                    ++lexer;
-                    std::optional<std::string> set = std::nullopt;
-                    std::optional<std::string> text;
-                    if (auto colon = lexer.expect<TokColon>(); !colon) {
-                        errors.push_back(std::move(colon.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                        return;
-                    }
-
-                    while (lexer.curr_is<TokNewline, TokTab>()) {
-                        ++lexer;
-                    }
-
-                    if (const auto set_tok = lexer.expect<TokSet>()) {
-                        if (auto ident = lexer.expect<TokIdent>();
-                            ident && set_tok->indent == t.indent + 1) {
-                            set = ident->name;
-                            while (lexer.curr_is_not<TokNewline, TokTab>()) {
-                                ++lexer;
-                            }
-                        } else {
-                            errors.push_back(std::move(ident.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    std::unique_ptr<NodeChoice> choice = nullptr;
-
-                    // special case: if the menu has a second line, it's
-                    // either a say statement or a choice.
-                    if (const auto str_tok = lexer.expect<TokStrLit>()) {
-                        if (auto newline = lexer.expect<TokNewline>();
-                            newline && str_tok->indent == t.indent + 1) {
-                            text = str_tok->text;
-                        } else if (const auto colon = lexer.expect<TokColon>()) {
-                            choice = std::make_unique<NodeChoice>(*colon, str_tok->text);
-                        } else if (const auto if_tok = lexer.expect<TokIf>()) {
-                            if (auto slice = expr_slice(lexer);
-                                slice && lexer.curr_is<TokColon>()) {
-                                choice = std::make_unique<NodeChoice>(*if_tok, str_tok->text, *slice);
-                            } else {
-                                errors.push_back(std::move(slice.error()));
-                                std::println(std::cerr, "{}", errors.back());
-                                return;
-                            }
-                        } else {
-                            errors.push_back(lexer.multi_tok_error<TokColon, TokIf, TokNewline>());
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                    }
-
-                    nodes.push_back(std::make_unique<NodeMenu>(t, text, set));
-                    if (choice != nullptr) {
-                        nodes.push_back(std::move(choice));
-                    }
-                },
-                [&](const TokLabel& t) {
-                    ++lexer;
-                    auto ident = lexer.expect<TokIdent>();
-                    if (!ident) {
                         errors.push_back(std::move(ident.error()));
                         std::println(std::cerr, "{}", errors.back());
                         return;
                     }
+                }
 
-                    if (auto colon = lexer.expect<TokColon>(); !colon) {
-                        errors.push_back(std::move(colon.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                        return;
-                    }
-                    nodes.push_back(std::make_unique<NodeLabel>(t, ident->name));
-                },
-                [&](const TokIdent &t) {
-                    ++lexer;
-                    if (auto str_lit = lexer.expect<TokStrLit>()) {
-                        nodes.push_back(std::make_unique<NodeDialogue>(t, t.name, str_lit->text));
-                    } else {
-                        errors.push_back(std::move(str_lit.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokStrLit &t) {
-                    /*
-                     * a few cases for string literals:
-                     *  1. colon at the end? menu choice
-                     *  2. if at the end? menu choice w/ expression
-                     *  3. newline? normal dialogue
-                     */
-                    ++lexer;
-                    if (const auto colon = lexer.expect<TokColon>()) {
-                        nodes.push_back(std::make_unique<NodeChoice>(t, t.text));
+                std::unique_ptr<NodeChoice> choice = nullptr;
+
+                // special case: if the menu has a second line, it's
+                // either a say statement or a choice.
+                if (const auto str_tok = lexer.expect<TokStrLit>()) {
+                    if (auto newline = lexer.expect<TokNewline>();
+                        newline && str_tok->indent == t.indent + 1) {
+                        text = str_tok->text;
+                    } else if (const auto colon = lexer.expect<TokColon>()) {
+                        choice = std::make_unique<NodeChoice>(*colon, str_tok->text);
                     } else if (const auto if_tok = lexer.expect<TokIf>()) {
                         if (auto slice = expr_slice(lexer);
                             slice && lexer.curr_is<TokColon>()) {
-                            nodes.push_back(std::make_unique<NodeChoice>(*if_tok, t.text, *slice));
+                            choice = std::make_unique<NodeChoice>(*if_tok, str_tok->text, *slice);
                         } else {
                             errors.push_back(std::move(slice.error()));
                             std::println(std::cerr, "{}", errors.back());
+                            return;
                         }
-                    } else if (lexer.curr_is<TokNewline>()) {
-                        nodes.push_back(std::make_unique<NodeDialogue>(t, t.text));
                     } else {
                         errors.push_back(lexer.multi_tok_error<TokColon, TokIf, TokNewline>());
                         std::println(std::cerr, "{}", errors.back());
+                        return;
                     }
-                },
-                [&](const TokDefault &t) {
-                    ++lexer;
-                    if (auto slice = expr_slice(lexer)) {
-                        if (auto new_expr = try_get_expr(lexer); is_valid_assign(new_expr->get())) {
-                            nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(*new_expr), false));
-                            nodes_w_expr.push_back(nodes.back().get());
-                        } else {
-                            errors.emplace_back(std::format("invalid Default declaration at {}", tok_pos(t)));
-                        }
+                }
+
+                nodes.push_back(std::make_unique<NodeMenu>(t, text, set));
+                if (choice != nullptr) {
+                    nodes.push_back(std::move(choice));
+                }
+            },
+            [&](const TokLabel& t) {
+                ++lexer;
+                auto ident = lexer.expect<TokIdent>();
+                if (!ident) {
+                    errors.push_back(std::move(ident.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return;
+                }
+
+                if (auto colon = lexer.expect<TokColon>(); !colon) {
+                    errors.push_back(std::move(colon.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return;
+                }
+                nodes.push_back(std::make_unique<NodeLabel>(t, ident->name));
+            },
+            [&](const TokIdent &t) {
+                ++lexer;
+                if (auto str_lit = lexer.expect<TokStrLit>()) {
+                    nodes.push_back(std::make_unique<NodeDialogue>(t, t.name, str_lit->text));
+                } else {
+                    errors.push_back(std::move(str_lit.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokStrLit &t) {
+                /*
+                 * a few cases for string literals:
+                 *  1. colon at the end? menu choice
+                 *  2. if at the end? menu choice w/ expression
+                 *  3. newline? normal dialogue
+                 */
+                ++lexer;
+                if (const auto colon = lexer.expect<TokColon>()) {
+                    nodes.push_back(std::make_unique<NodeChoice>(t, t.text));
+                } else if (const auto if_tok = lexer.expect<TokIf>()) {
+                    if (auto slice = expr_slice(lexer);
+                        slice && lexer.curr_is<TokColon>()) {
+                        nodes.push_back(std::make_unique<NodeChoice>(*if_tok, t.text, *slice));
                     } else {
                         errors.push_back(std::move(slice.error()));
                         std::println(std::cerr, "{}", errors.back());
                     }
-                },
-                [&](const TokDefine &t) {
-                    ++lexer;
-                    if (auto slice = expr_slice(lexer)) {
+                } else if (lexer.curr_is<TokNewline>()) {
+                    nodes.push_back(std::make_unique<NodeDialogue>(t, t.text));
+                } else {
+                    errors.push_back(lexer.multi_tok_error<TokColon, TokIf, TokNewline>());
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokDefault &t) {
+                ++lexer;
+                if (auto slice = expr_slice(lexer)) {
+                    if (auto new_expr = try_get_expr(lexer); is_valid_assign(new_expr->get())) {
+                        nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(*new_expr), false));
+                        nodes_w_expr.push_back(nodes.back().get());
+                    } else {
+                        errors.emplace_back(std::format("invalid Default declaration at {}", tok_pos(t)));
+                    }
+                } else {
+                    errors.push_back(std::move(slice.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokDefine &t) {
+                ++lexer;
+                if (auto slice = expr_slice(lexer)) {
 
-                        if (auto new_expr = fold_into_expr(*slice); is_valid_assign(new_expr->get())) {
-                            nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(*new_expr), true));
-                            nodes_w_expr.push_back(nodes.back().get());
-                        } else {
-                            errors.emplace_back(std::format("invalid Define declaration at {}", tok_pos(t)));
-                        }
+                    if (auto new_expr = fold_into_expr(*slice); is_valid_assign(new_expr->get())) {
+                        nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(*new_expr), true));
+                        nodes_w_expr.push_back(nodes.back().get());
                     } else {
-                        errors.push_back(std::move(slice.error()));
-                        std::println(std::cerr, "{}", errors.back());
+                        errors.emplace_back(std::format("invalid Define declaration at {}", tok_pos(t)));
                     }
-                },
-                [&](const TokPlay& t) {
-                    ++lexer;
-                    AudioChannel channel;
-                    if (auto music = lexer.expect<TokMusic>()) {
-                        channel = AudioChannel::Music;
-                    } else if (const auto sfx = lexer.expect<TokSfx>()) {
-                        channel = AudioChannel::Sfx;
-                    } else {
-                        errors.push_back(lexer.multi_tok_error<TokMusic, TokSfx>());
-                        std::println(std::cerr, "{}", errors.back());
-                    }
+                } else {
+                    errors.push_back(std::move(slice.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokPlay& t) {
+                ++lexer;
+                AudioChannel channel;
+                if (auto music = lexer.expect<TokMusic>()) {
+                    channel = AudioChannel::Music;
+                } else if (const auto sfx = lexer.expect<TokSfx>()) {
+                    channel = AudioChannel::Sfx;
+                } else {
+                    errors.push_back(lexer.multi_tok_error<TokMusic, TokSfx>());
+                    std::println(std::cerr, "{}", errors.back());
+                }
 
-                    if (auto path = lexer.expect<TokStrLit>()) {
-                        nodes.push_back(std::make_unique<NodePlay>(t, channel, path->text));
-                    } else {
-                        errors.push_back(std::move(path.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokIf& t) {
-                    if (auto if_node = add_cond_node<NodeIf>(t)) {
-                        nodes.push_back(std::move(if_node));
-                        nodes_w_expr.push_back(nodes.back().get());
-                    }
-                },
-                [&](const TokElif& t) {
-                    if (auto elif_node = add_cond_node<NodeElif>(t)) {
-                        nodes.push_back(std::move(elif_node));
-                        nodes_w_expr.push_back(nodes.back().get());
-                    }
-                },
-                [&](const TokElse& t) {
-                    ++lexer;
-                    if (auto colon = lexer.expect<TokColon>()) {
-                        nodes.push_back(std::make_unique<NodeElse>(t));
-                    } else {
-                        errors.push_back(std::move(colon.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokWhile& t) {
-                    if (auto while_node = add_cond_node<NodeWhile>(t)) {
-                        nodes.push_back(std::move(while_node));
-                        nodes_w_expr.push_back(nodes.back().get());
-                    }
-                },
-                [&](const TokReturn& t) {
-                    ++lexer;
-                    if (auto slice = expr_slice(lexer)) {
-                        nodes.push_back(std::make_unique<NodeReturn>(t, *slice));
-                        nodes_w_expr.push_back(nodes.back().get());
-                    } else {
-                        nodes.push_back(std::make_unique<NodeReturn>(t));
-                    }
-                },
-                [&](const TokPass& t) {
-                    ++lexer;
-                    nodes.push_back(std::make_unique<NodePass>(t));
-                },
-                [&](const TokCall& t) {
-                    ++lexer;
-                    if (auto ident = lexer.expect<TokIdent>()) {
-                        nodes.push_back(std::make_unique<NodeCall>(t, ident->name));
-                    } else {
-                        errors.push_back(std::move(ident.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokJump& t) {
-                    ++lexer;
-                    if (auto ident = lexer.expect<TokIdent>()) {
-                        nodes.push_back(std::make_unique<NodeCall>(t, ident->name));
-                    } else {
-                        errors.push_back(std::move(ident.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                    }
-                },
-                [&](const TokImage &t) {
-                    ++lexer;
-                    std::vector<std::string> attrs;
-                    auto name = lexer.expect<TokIdent>();
-                    if (!name) {
-                        errors.push_back(std::move(name.error()));
+                if (auto path = lexer.expect<TokStrLit>()) {
+                    nodes.push_back(std::make_unique<NodePlay>(t, channel, path->text));
+                } else {
+                    errors.push_back(std::move(path.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokIf& t) {
+                if (auto if_node = add_cond_node<NodeIf>(t)) {
+                    nodes.push_back(std::move(if_node));
+                    nodes_w_expr.push_back(nodes.back().get());
+                }
+            },
+            [&](const TokElif& t) {
+                if (auto elif_node = add_cond_node<NodeElif>(t)) {
+                    nodes.push_back(std::move(elif_node));
+                    nodes_w_expr.push_back(nodes.back().get());
+                }
+            },
+            [&](const TokElse& t) {
+                ++lexer;
+                if (auto colon = lexer.expect<TokColon>()) {
+                    nodes.push_back(std::make_unique<NodeElse>(t));
+                } else {
+                    errors.push_back(std::move(colon.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokWhile& t) {
+                if (auto while_node = add_cond_node<NodeWhile>(t)) {
+                    nodes.push_back(std::move(while_node));
+                    nodes_w_expr.push_back(nodes.back().get());
+                }
+            },
+            [&](const TokReturn& t) {
+                ++lexer;
+                if (auto slice = expr_slice(lexer)) {
+                    nodes.push_back(std::make_unique<NodeReturn>(t, *slice));
+                    nodes_w_expr.push_back(nodes.back().get());
+                } else {
+                    nodes.push_back(std::make_unique<NodeReturn>(t));
+                }
+            },
+            [&](const TokPass& t) {
+                ++lexer;
+                nodes.push_back(std::make_unique<NodePass>(t));
+            },
+            [&](const TokCall& t) {
+                ++lexer;
+                if (auto ident = lexer.expect<TokIdent>()) {
+                    nodes.push_back(std::make_unique<NodeCall>(t, ident->name));
+                } else {
+                    errors.push_back(std::move(ident.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokJump& t) {
+                ++lexer;
+                if (auto ident = lexer.expect<TokIdent>()) {
+                    nodes.push_back(std::make_unique<NodeCall>(t, ident->name));
+                } else {
+                    errors.push_back(std::move(ident.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                }
+            },
+            [&](const TokImage &t) {
+                ++lexer;
+                std::vector<std::string> attrs;
+                auto name = lexer.expect<TokIdent>();
+                if (!name) {
+                    errors.push_back(std::move(name.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return;
+                }
+
+                while (!lexer.curr_is<TokOp>()) {
+                    auto attr = lexer.expect<TokIdent>();
+                    if (!attr) {
+                        errors.push_back(std::move(attr.error()));
                         std::println(std::cerr, "{}", errors.back());
                         return;
                     }
+                    attrs.push_back(attr->name);
+                }
 
-                    while (!lexer.curr_is<TokOp>()) {
-                        auto attr = lexer.expect<TokIdent>();
-                        if (!attr) {
-                            errors.push_back(std::move(attr.error()));
-                            std::println(std::cerr, "{}", errors.back());
-                            return;
-                        }
-                        attrs.push_back(attr->name);
-                    }
+                auto assign = lexer.expect<TokOp>();
+                if (!assign || assign->type != OpType::Assign) {
+                    errors.push_back(std::move(assign.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return;
+                }
 
-                    auto assign = lexer.expect<TokOp>();
-                    if (!assign || assign->type != OpType::Assign) {
-                        errors.push_back(std::move(assign.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                        return;
-                    }
-
-                    auto file_path = lexer.expect<TokStrLit>();
-                    if (!file_path) {
-                        errors.push_back(std::move(file_path.error()));
-                        std::println(std::cerr, "{}", errors.back());
-                        return;
-                    }
-                    nodes.push_back(std::make_unique<NodeImage>(t, name->name, std::move(attrs), file_path->text));
-                },
-                [&](const TokNewline&) {
-                },
-                [&](const TokTab&) {
-                },
-                [&]<typename U>(U&& other) {
-                    using To = std::decay_t<U>;
-                    static_assert(std::is_base_of_v<Tok, To>, "expected derived from base Tok");
-                    std::string msg = std::format("unexpected token {} at {}", tok_name<To>(), tok_pos(other));
-                    errors.push_back(msg);
-                    std::println(std::cerr, "{}", msg);
-                },
-            }, token);
+                auto file_path = lexer.expect<TokStrLit>();
+                if (!file_path) {
+                    errors.push_back(std::move(file_path.error()));
+                    std::println(std::cerr, "{}", errors.back());
+                    return;
+                }
+                nodes.push_back(std::make_unique<NodeImage>(t, name->name, std::move(attrs), file_path->text));
+            },
+            [&](const TokNewline&) {
+            },
+            [&](const TokTab&) {
+            },
+            [&]<typename U>(U&& other) {
+                using To = std::decay_t<U>;
+                static_assert(std::is_base_of_v<Tok, To>, "expected derived from base Tok");
+                std::string msg = std::format("unexpected token {} at {}", tok_name<To>(), tok_pos(other));
+                errors.push_back(msg);
+                std::println(std::cerr, "{}", msg);
+            },
+        }, token);
         ++lexer;
     }
 
@@ -560,6 +568,11 @@ void Graph::generate_nodes() {
         }
     }
     std::println("--------------------");
+    std::println("====================");
+    for (const auto &n : nodes_w_atl) {
+        std::println("{:p}", *n);
+    }
+    std::println("====================");
 }
 
 Graph::Graph(const std::filesystem::path& path)

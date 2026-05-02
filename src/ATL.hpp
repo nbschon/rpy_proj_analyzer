@@ -149,6 +149,20 @@ enum class RotationType : std::uint8_t {
     CCWise,
 };
 
+enum class Event : std::uint8_t {
+    Start,
+    Show,
+    Replace,
+    Hide,
+    Replaced, // note the 'd' at the end
+    Hover,
+    Idle,
+    SelectedHover,
+    SelectedIdle,
+    Insensitive,
+    SelectedInsensitive,
+};
+
 struct ATLProperty;
 struct ATLNumber;
 struct ATLInterp;
@@ -229,7 +243,7 @@ struct ATLAnimation {
 };
 
 struct ATLOn {
-    std::vector<std::string> events;
+    std::vector<Event> events;
     std::vector<ATLStmt> block;
 };
 
@@ -247,7 +261,7 @@ struct ATLContainsInline {
 };
 
 struct ATLContainsBlock {
-    std::unique_ptr<Expr> displayable;
+    // std::unique_ptr<Expr> displayable;
     std::vector<ATLStmt> block;
 };
 
@@ -284,10 +298,25 @@ public:
     static auto get_trans(const std::string_view &str) -> Transition;
     static auto get_warper(const std::string_view &str) -> Warper;
     static auto get_prop(const std::string_view &str) -> TFProp;
+    static auto get_event(const std::string_view &str) -> Event;
+
+    static auto get_str(const ATLStmt &stmt) -> std::string;
 
     static auto trans_str(const Transition &trans) -> std::string;
     static auto warper_str(const Warper &warper) -> std::string;
     static auto prop_str(const TFProp &type) -> std::string;
+    static auto event_str(const Event &event) -> std::string;
+};
+
+template<>
+struct std::formatter<ATLStmt> {
+    constexpr auto parse(const std::format_parse_context &ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const ATLStmt &stmt, std::format_context &ctx) const {
+        return std::format_to(ctx.out(), "{}", ATL::get_str(stmt));
+    }
 };
 
 

@@ -20,6 +20,7 @@ class Graph {
     std::vector<bool> visited;
     std::vector<std::string> errors;
     std::vector<Node*> nodes_w_expr;
+    std::vector<Node*> nodes_w_atl;
     std::vector<Token> tokens;
     Lexer lexer;
 
@@ -57,7 +58,7 @@ class Graph {
         return nullptr;
     }
 
-    [[nodiscard]] auto add_show_node(const Tok& t, bool is_scene = false) -> std::unique_ptr<Node>;
+    [[nodiscard]] auto add_show_node(const Tok& t, bool& has_atl, bool is_scene = false) -> std::unique_ptr<NodeShow>;
 
     void generate_nodes();
 

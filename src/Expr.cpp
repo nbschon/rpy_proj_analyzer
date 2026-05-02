@@ -39,21 +39,20 @@ ExprCall::ExprCall(std::vector<std::unique_ptr<Expr>> args,
 }
 
 auto ExprLit::to_string() const -> std::string {
-    return std::visit(
-        Overload{
-            [&](const int& val) -> std::string {
-                return std::format("[Integer Literal: {}]", val);
-            },
-            [&](const double& val) -> std::string {
-                return std::format("[Float Literal: {}]", val);
-            },
-            [&](const bool& val) -> std::string {
-                return std::format("[Boolean Literal: {}]", val);
-            },
-            [&](const std::string& val) -> std::string {
-                return std::format("[String Literal: {}]", val);
-            }
-        }, value);
+    return std::visit(Overload {
+        [&](const int& val) -> std::string {
+            return std::format("[Integer Literal: {}]", val);
+        },
+        [&](const double& val) -> std::string {
+            return std::format("[Float Literal: {}]", val);
+        },
+        [&](const bool& val) -> std::string {
+            return std::format("[Boolean Literal: {}]", val);
+        },
+        [&](const std::string& val) -> std::string {
+            return std::format("[String Literal: {}]", val);
+        }
+    }, value);
 }
 
 auto ExprVar::to_string() const -> std::string {
@@ -107,63 +106,62 @@ auto ExprCall::to_string() const -> std::string {
 auto expr_slice(Lexer &lexer) -> std::expected<std::span<const Token>, std::string> {
     const auto start_idx = lexer.get_idx();
 
+    if (!lexer.has_more()) {
+        return std::unexpected("reached end of Tokens");
+    }
+
     bool get_toks = true;
     while (get_toks && lexer.has_more()) {
         const auto& token = lexer.curr();
-        std::visit(
-            Overload {
-                [&](const TokIdent&) -> void {
-                    ++lexer;
-                },
-                [&](const TokStrLit&) -> void {
-                    ++lexer;
-                },
-                [&](const TokIntLit&) -> void {
-                    ++lexer;
-                },
-                [&](const TokFloatLit&) -> void {
-                    ++lexer;
-                },
-                [&](const TokBoolLit&) -> void {
-                    ++lexer;
-                },
-                [&](const TokOp&) -> void {
-                    ++lexer;
-                },
-                [&](const TokLParen&) -> void {
-                    ++lexer;
-                },
-                [&](const TokRParen&) -> void {
-                    ++lexer;
-                },
-                [&](const TokComma&) -> void {
-                    ++lexer;
-                },
-                [&](const TokNone) -> void {
-                    ++lexer;
-                },
-                [&]<typename U>(U&& other) -> void {
-                    get_toks = false;
-                    // using V = std::decay_t<U>;
-                    // static_assert(std::is_base_of_v<Tok, V>, "expected derived from base Tok");
-                    // const auto base_tok = static_cast<const Tok &>(other);
-                    // error_msg = std::format("expected viable Expr token, got {} at {}", tok_name<V>(),
-                    //                         tok_pos(base_tok));
-                },
-            }, token);
+        std::visit(Overload {
+            [&](const TokIdent&) -> void {
+                ++lexer;
+            },
+            [&](const TokStrLit&) -> void {
+                ++lexer;
+            },
+            [&](const TokIntLit&) -> void {
+                ++lexer;
+            },
+            [&](const TokFloatLit&) -> void {
+                ++lexer;
+            },
+            [&](const TokBoolLit&) -> void {
+                ++lexer;
+            },
+            [&](const TokOp&) -> void {
+                ++lexer;
+            },
+            [&](const TokLParen&) -> void {
+                ++lexer;
+            },
+            [&](const TokRParen&) -> void {
+                ++lexer;
+            },
+            [&](const TokComma&) -> void {
+                ++lexer;
+            },
+            [&](const TokNone) -> void {
+                ++lexer;
+            },
+            [&]<typename U>(U&&) -> void {
+                get_toks = false;
+            },
+        }, token);
     }
 
     const auto count = lexer.get_idx() - start_idx;
     if (count == 0) {
         return std::unexpected(
-            std::format("failed to make span of valid Tokens at {}", tok_pos(lexer.curr())));
+            std::format("failed to make span of valid Tokens at {}", tok_pos(
+                lexer.get_tokens().at(start_idx))));
     }
 
     const std::span all(lexer.get_tokens().data(), lexer.get_tokens().size());
     return all.subspan(start_idx, count);
 }
 
-auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx)// -> std::unique_ptr<ExprCall> {
+auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx)
 -> std::expected<std::unique_ptr<ExprCall>, std::string> {
     auto idx = start_idx;
     int n_l = 0;
@@ -262,47 +260,44 @@ auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_p
 
     // TODO: graceful error reporting instead of crashing
     const auto lhs_tok = consume();
-    auto lhs = std::visit(
-        Overload{
-            [&](const TokIdent& t) -> Result {
-                return std::make_unique<ExprVar>(t.name);
-            },
-            [&](const TokStrLit& t) -> Result {
-                return std::make_unique<ExprLit>(t.text);
-            },
-            [&](const TokIntLit& t) -> Result {
-                return std::make_unique<ExprLit>(t.value);
-            },
-            [&](const TokFloatLit& t) -> Result {
-                return std::make_unique<ExprLit>(t.value);
-            },
-            [&](const TokBoolLit& t) -> Result {
-                return std::make_unique<ExprLit>(t.value);
-            },
-            [&](const TokLParen&) -> Result {
-                auto expr = fold_into_expr(toks, idx, 0.0f);
+    auto lhs = std::visit(Overload {
+        [&](const TokIdent& t) -> Result {
+            return std::make_unique<ExprVar>(t.name);
+        },
+        [&](const TokStrLit& t) -> Result {
+            return std::make_unique<ExprLit>(t.text);
+        },
+        [&](const TokIntLit& t) -> Result {
+            return std::make_unique<ExprLit>(t.value);
+        },
+        [&](const TokFloatLit& t) -> Result {
+            return std::make_unique<ExprLit>(t.value);
+        },
+        [&](const TokBoolLit& t) -> Result {
+            return std::make_unique<ExprLit>(t.value);
+        },
+        [&](const TokLParen&) -> Result {
+            auto expr = fold_into_expr(toks, idx, 0.0f);
 
-                if (expr) {
-                    if (std::holds_alternative<TokRParen>(*peek())) {
-                        return std::unexpected(std::format("expected RParen at {}", tok_pos(*peek())));
-                    }
-                    consume();
-                    return expr;
+            if (expr) {
+                if (std::holds_alternative<TokRParen>(*peek())) {
+                    return std::unexpected(std::format("expected RParen at {}", tok_pos(*peek())));
                 }
+                consume();
+                return expr;
+            }
 
-                return std::unexpected(expr.error());
-            },
-            [&](const TokOp& t) -> Result {
-                auto [l_prec, r_prec] = precedence(t.type);
-                auto rhs = fold_into_expr(toks, idx, r_prec);
-                return std::make_unique<ExprUnary>(t.type, std::move(*rhs));
-            },
-            [&](auto&&) -> Result {
-                return std::unexpected("bad token in expression");
-                std::println(std::cerr, "bad token in expression");
-                std::unreachable();
-            },
-        }, lhs_tok);
+            return std::unexpected(expr.error());
+        },
+        [&](const TokOp& t) -> Result {
+            auto [l_prec, r_prec] = precedence(t.type);
+            auto rhs = fold_into_expr(toks, idx, r_prec);
+            return std::make_unique<ExprUnary>(t.type, std::move(*rhs));
+        },
+        [&](auto&&) -> Result {
+            return std::unexpected("bad token in expression");
+        },
+    }, lhs_tok);
 
     while (true) {
         if (!peek()) {

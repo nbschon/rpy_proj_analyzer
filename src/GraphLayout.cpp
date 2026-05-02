@@ -6,10 +6,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <ranges>
-
 #include <chrono>
-#include <thread>
+#include <ranges>
 
 auto Layout::make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, const unsigned prev_idx,
                       const unsigned idx) -> std::unique_ptr<LayoutGroup> {
@@ -31,19 +29,17 @@ auto Layout::make_ifs(const std::vector<std::unique_ptr<Node>>& nodes, const uns
 
     auto next = nodes.at(idx)->next;
     while (do_grouping && next) {
-        if (dynamic_cast<NodeIf*>(nodes.at(*next).get())) {
+        if (auto *node = nodes.at(*next).get(); dynamic_cast<NodeIf*>(node) != nullptr) {
             do_grouping = false;
-        } else if (dynamic_cast<NodeElif*>(nodes.at(*next).get())) {
+        } else if (dynamic_cast<NodeElif*>(node) != nullptr) {
             col_header_idxs.push_back(*next);
-            if (auto *elif_node = dynamic_cast<NodeElif*>(nodes.at(*next).get());
-                elif_node->first_child && elif_node->after_block) {
+            if (auto *elif_node = dynamic_cast<NodeElif*>(node); elif_node->first_child && elif_node->after_block) {
                 LayoutColumn col(nodes, prev_idx, *next, elif_node);
                 branches.push_back(std::move(col));
             }
-        } else if (dynamic_cast<NodeElse*>(nodes.at(*next).get())) {
+        } else if (dynamic_cast<NodeElse*>(node) != nullptr) {
             col_header_idxs.push_back(*next);
-            if (auto *else_node = dynamic_cast<NodeElse*>(nodes.at(*next).get());
-                else_node->first_child && else_node->after_block) {
+            if (auto *else_node = dynamic_cast<NodeElse*>(node); else_node->first_child && else_node->after_block) {
                 LayoutColumn col(nodes, prev_idx, *next, else_node);
                 branches.push_back(std::move(col));
             }
@@ -75,11 +71,12 @@ auto Layout::make_menu(const std::vector<std::unique_ptr<Node>>& nodes, const un
     bool do_grouping = true;
     auto next = menu->first_child;
     while (do_grouping && next) {
-        if (const auto *choice = dynamic_cast<NodeChoice*>(nodes.at(*next).get());
-            choice->first_child && choice->after_block) {
-            col_header_idxs.push_back(*next);
-            LayoutColumn col(nodes, parent_idx, *next, choice);
-            choices.emplace_back(std::move(col));
+        if (const auto *choice = dynamic_cast<NodeChoice*>(nodes.at(*next).get())) {
+            if (choice->first_child && choice->after_block) {
+                col_header_idxs.push_back(*next);
+                LayoutColumn col(nodes, parent_idx, *next, choice);
+                choices.emplace_back(std::move(col));
+            }
         } else if (dynamic_cast<NodeMenu*>(nodes.at(*next).get()) != nullptr) {
             do_grouping = false;
         }
@@ -100,7 +97,8 @@ auto Layout::make_label(const std::vector<std::unique_ptr<Node>>& nodes,
                         const unsigned header_idx, const unsigned idx) -> std::unique_ptr<LayoutGroup> {
     const auto label_idx = idx;
 
-    const auto *label = dynamic_cast<NodeLabel*>(nodes.at(idx).get());
+    const auto *label = dynamic_cast<NodeLabel*>(nodes.at(label_idx).get());
+    std::println("{:p}", *nodes.at(label_idx));
 
     std::vector<LayoutColumn> column;
     LayoutColumn col(nodes, header_idx, idx, label);
@@ -185,39 +183,43 @@ auto LayoutItem::get_pre_item() -> std::optional<unsigned> {
 LayoutColumn::LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, const unsigned parent_idx,
                            const unsigned first_node, const NodeParent* parent_ptr)
     : LayoutBase(parent_idx) {
-    auto i = *parent_ptr->first_child;
+    if (parent_ptr->first_child && parent_ptr->after_block) {
+        auto child_idx = *parent_ptr->first_child;
 
-    this->displays.emplace_back(std::make_unique<LayoutItem>(first_node));
-    std::optional<unsigned> prev_idx = first_node;
+        this->displays.emplace_back(std::make_unique<LayoutItem>(first_node));
+        std::optional<unsigned> prev_idx = first_node;
 
-    while (i < *parent_ptr->after_block) {
-        const auto& n = nodes.at(i);
-        std::unique_ptr<LayoutGroup> group_ptr = nullptr;
+        while (child_idx < *parent_ptr->after_block) {
+            const auto& n = nodes.at(child_idx);
+            std::unique_ptr<LayoutGroup> group_ptr = nullptr;
 
-        if (n->has_children()) {
-            if (dynamic_cast<NodeIf*>(n.get())) {
-                this->displays.emplace_back(Layout::make_ifs(nodes, *prev_idx, i));
-            } else if (dynamic_cast<NodeMenu*>(n.get())) {
-                // ==============================================================
-                // kind of a hack, but necessary due to the way menus are grouped
-                this->displays.emplace_back(std::make_unique<LayoutItem>(i));
-                // ==============================================================
+            if (n->has_children()) {
+                if (dynamic_cast<NodeIf*>(n.get())) {
+                    this->displays.emplace_back(Layout::make_ifs(nodes, *prev_idx, child_idx));
+                } else if (dynamic_cast<NodeMenu*>(n.get())) {
+                    // ==============================================================
+                    // kind of a hack, but necessary due to the way menus are grouped
+                    this->displays.emplace_back(std::make_unique<LayoutItem>(child_idx));
+                    // ==============================================================
 
-                // then just do it like normal
-                this->displays.emplace_back(Layout::make_menu(nodes, *prev_idx, i));
-            } else if (dynamic_cast<NodeLabel*>(n.get())) {
-                this->displays.emplace_back(Layout::make_label(nodes, *prev_idx, i));
+                    // then just do it like normal
+                    this->displays.emplace_back(Layout::make_menu(nodes, *prev_idx, child_idx));
+                } else if (dynamic_cast<NodeLabel*>(n.get())) {
+                    this->displays.emplace_back(Layout::make_label(nodes, *prev_idx, child_idx));
+                }
+            } else {
+                this->displays.emplace_back(std::make_unique<LayoutItem>(child_idx));
             }
-        } else {
-            this->displays.emplace_back(std::make_unique<LayoutItem>(i));
-        }
 
 
-        prev_idx = i;
-        if (!n->next) {
-            break;
+            prev_idx = child_idx;
+            if (!n->next) {
+                break;
+            }
+            child_idx = *n->next;
         }
-        i = *n->next;
+    } else {
+        displays.emplace_back(std::make_unique<LayoutItem>(first_node));
     }
 }
 
@@ -362,7 +364,7 @@ void GraphLayout::assign_layouts() {
     unsigned y_pos = 0;
     for (const auto& group : top_levels) {
         Layout::layout_node(*group, 0, y_pos);
-        if (dynamic_cast<LayoutGroup*>(group.get())) {
+        if (dynamic_cast<LayoutGroup*>(group.get()) != nullptr) {
             y_pos += group->height + 1;
         } else {
             group->layout.left_x = get_max_width() / 2;
@@ -388,12 +390,13 @@ auto GraphLayout::collect_edges() const -> std::unordered_map<Node*, Node*> {
 
 GraphLayout::GraphLayout(Graph& graph) {
     for (int i = 0; i < graph.get_nodes().size(); ++i) {
-        const auto& n = graph.get_nodes().at(i);
-        // TODO: make this *not* just assume labels are the roots
-        if (dynamic_cast<NodeLabel*>(n.get()) != nullptr) {
-            top_levels.emplace_back(Layout::make_label(graph.get_nodes(), i, i));
-        } else if (n->indent == 0){
-            top_levels.emplace_back(std::make_unique<LayoutItem>(i));
+        const auto& node = graph.get_nodes().at(i);
+        if (node->indent == 0) {
+            if (dynamic_cast<NodeLabel*>(node.get()) != nullptr) {
+                top_levels.emplace_back(Layout::make_label(graph.get_nodes(), i, i));
+            } else {
+                top_levels.emplace_back(std::make_unique<LayoutItem>(i));
+            }
         }
     }
 
@@ -401,16 +404,7 @@ GraphLayout::GraphLayout(Graph& graph) {
     assign_layouts();
     flatten();
 
-    std::println("{} total display nodes, {} graph nodes.", flat_disps.size(), graph.get_nodes().size());
-    // std::println("====================");
-    // for (const auto &d : flat_disps) {
-    //     // std::println("{:p}", *graph.get_nodes().at(d->get_idx()));
-    // }
-    // std::println("====================");
-    // for (const auto &n : graph.get_nodes()) {
-    //     // std::println("{:p}", *n);
-    // }
-    // std::println("====================");
+    std::println("{} display nodes, {} graph nodes.", flat_disps.size(), graph.get_nodes().size());
 
     assert(flat_disps.size() == graph.get_nodes().size());
 }

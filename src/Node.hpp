@@ -37,16 +37,11 @@ struct ShowProps {
     std::optional<std::string> behind;
     std::optional<std::string> onlayer;
     std::optional<int> zorder;
-};
-
-struct HideProps {
-    std::optional<std::string> onlayer;
-    // std::optional<std::string> trans;
+    std::vector<ATLStmt> atl_stmts;
 };
 
 class Node {
-// protected:
-public:
+protected:
     unsigned line = 0;
     unsigned col = 0;
 
@@ -62,9 +57,6 @@ public:
     Node(unsigned line, unsigned col, unsigned indent);
 
     virtual ~Node() = default;
-
-    // i.e. meaning you must either proceed through children first
-    // or simply continue to the following node
 
     [[nodiscard]] auto line_and_col() const -> std::pair<unsigned, unsigned>;
 
@@ -96,8 +88,7 @@ class NodeShow final : public Node {
     std::optional<std::string> behind;
     std::optional<std::string> onlayer;
     std::optional<int> zorder;
-    // std::vector<ATLStmt
-    // std::optional<std::string> trans;
+    std::vector<ATLStmt> atl_stmts;
     bool is_scene = false;
 
 public:

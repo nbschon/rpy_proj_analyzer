@@ -205,14 +205,7 @@ struct ExprCall : Expr {
     [[nodiscard]] auto to_string() const -> std::string override;
 };
 
-// [[nodiscard]] auto expr_toks(Expr *expr) -> std::span<const Token> {
-//
-// };
-
-// template<typename... Ts>
-// requires (InTokens<Ts> && ...)
 [[nodiscard]] auto expr_slice(Lexer &lexer) -> std::expected<std::span<const Token>, std::string>;
-
 
 [[nodiscard]] auto split_inside_parens(std::span<const Token> toks, unsigned &start_idx)
 -> std::expected<std::unique_ptr<ExprCall>, std::string>;

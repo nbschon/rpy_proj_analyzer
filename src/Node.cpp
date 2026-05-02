@@ -58,6 +58,9 @@ NodeShow::NodeShow(const Tok& token, std::string name, std::vector<std::string> 
     if (props.zorder) {
         zorder = props.zorder;
     }
+    if (!props.atl_stmts.empty()) {
+        atl_stmts = std::move(props.atl_stmts);
+    }
 }
 
 auto NodeShow::to_string() const -> std::string {
@@ -73,6 +76,15 @@ auto NodeShow::to_string() const -> std::string {
     }
     if (!transforms.empty()) {
         ret += std::ranges::fold_left(transforms, " w/ transforms", [](std::string out, const std::string& s) {
+            out += std::format(" \"{}\",", s);
+            return out;
+        });
+        if (ret.ends_with(',')) {
+            ret.pop_back();
+        }
+    }
+    if (!atl_stmts.empty()) {
+        ret += std::ranges::fold_left(atl_stmts, " ATL:", [](std::string out, const ATLStmt& s) {
             out += std::format(" \"{}\",", s);
             return out;
         });
@@ -110,6 +122,16 @@ auto NodeShow::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
             tf_str.pop_back();
         }
         fields.push_back(tf_str);
+    }
+    if (!atl_stmts.empty()) {
+        auto atl_str = std::ranges::fold_left(atl_stmts, "ATL:", [](std::string out, const ATLStmt& s) {
+                out += std::format(" \"{}\",", s);
+                return out;
+            });
+        if (atl_str.ends_with(',')) {
+            atl_str.pop_back();
+        }
+        fields.push_back(atl_str);
     }
     return {this, rect, is_scene ? "Scene" : "Show", std::move(fields)};
 }

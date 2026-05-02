@@ -40,6 +40,7 @@ enum class OpType : std::uint8_t {
 enum class TFProp : std::uint8_t;
 enum class Warper : std::uint8_t;
 enum class Transition : std::uint8_t;
+enum class Event : std::uint8_t;
 
 struct Tok {
     unsigned line;
@@ -171,9 +172,9 @@ struct TokDefine : Tok {
     static constexpr std::string_view type_name = "Define";
 };
 
-struct TokSet : Tok {
-    static constexpr std::string_view type_name = "Set";
-};
+// struct TokSet : Tok {
+//     static constexpr std::string_view type_name = "Set";
+// };
 
 struct TokPlay : Tok {
     static constexpr std::string_view type_name = "Play";
@@ -299,6 +300,7 @@ struct TokATLTime : Tok {
 
 struct TokATLEvent : Tok {
     static constexpr std::string_view type_name = "ATLEvent";
+    Event event;
 };
 
 struct TokATLTransition : Tok {
@@ -310,6 +312,7 @@ struct TokATLWarper : Tok {
     static constexpr std::string_view type_name = "ATLWarper";
     Warper warper;
 };
+
 // ATL tokens end here.
 
 struct TokNewline : Tok {
@@ -351,7 +354,7 @@ using Token = std::variant<
     TokOp,
     TokDefault,
     TokDefine,
-    TokSet,
+    // TokSet,
     TokPlay,
     TokMusic,
     TokSfx,

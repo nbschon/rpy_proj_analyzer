@@ -334,57 +334,56 @@ auto TextHelper::draw_text(const std::string_view text, const raylib::Vector2 po
     };
 
     for (const auto& word : ds) {
-        std::visit(
-            Overload{
-                [&](const std::vector<DispGlyph>& dgs) {
-                    const auto word_width = std::ranges::fold_left(
-                        dgs, 0.0f,
-                        [](const float w, const DispGlyph& dg) {
-                            return w + dg.advance;
-                        });
-                    if (word_width > pos.x + width && width > 0) {
-                        // if whole word is longer than box, wrap it
-                        auto split = split_displayable(dgs, width);
-                        for (const auto &split_dgs : split) {
-                            for (const auto &dg : split_dgs) {
-                                draw_glyph(dg);
-                            }
-                            reset_cursor();
-                            just_wrapped = true;
+        std::visit(Overload {
+            [&](const std::vector<DispGlyph>& dgs) {
+                const auto word_width = std::ranges::fold_left(
+                    dgs, 0.0f,
+                    [](const float w, const DispGlyph& dg) {
+                        return w + dg.advance;
+                    });
+                if (word_width > pos.x + width && width > 0) {
+                    // if whole word is longer than box, wrap it
+                    auto split = split_displayable(dgs, width);
+                    for (const auto &split_dgs : split) {
+                        for (const auto &dg : split_dgs) {
+                            draw_glyph(dg);
                         }
-                    } else if (word_width + cursor_x > pos.x + width && width > 0) {
-                        // if word goes beyond box, push to next line
                         reset_cursor();
-                        for (const auto &dg : dgs) {
-                            draw_glyph(dg);
-                        }
-                    } else {
-                        // otherwise, draw normally
-                        for (const auto &dg : dgs) {
-                            draw_glyph(dg);
-                        }
+                        just_wrapped = true;
                     }
-
-                    just_wrapped = false;
-                },
-                [&](const WSpaceType& ws) {
-                    switch (ws) {
-                        case WSpaceType::Space:
-                            if (!just_wrapped) {
-                                draw_glyph(space_glyph);
-                            }
-                            break;
-                        case WSpaceType::Tab:
-                            for (int i = 0; i < 4; ++i) {
-                                draw_glyph(space_glyph);
-                            }
-                            break;
-                        case WSpaceType::Newline:
-                            reset_cursor();
-                            break;
+                } else if (word_width + cursor_x > pos.x + width && width > 0) {
+                    // if word goes beyond box, push to next line
+                    reset_cursor();
+                    for (const auto &dg : dgs) {
+                        draw_glyph(dg);
+                    }
+                } else {
+                    // otherwise, draw normally
+                    for (const auto &dg : dgs) {
+                        draw_glyph(dg);
                     }
                 }
-            }, word);
+
+                just_wrapped = false;
+            },
+            [&](const WSpaceType& ws) {
+                switch (ws) {
+                    case WSpaceType::Space:
+                        if (!just_wrapped) {
+                            draw_glyph(space_glyph);
+                        }
+                        break;
+                    case WSpaceType::Tab:
+                        for (int i = 0; i < 4; ++i) {
+                            draw_glyph(space_glyph);
+                        }
+                        break;
+                    case WSpaceType::Newline:
+                        reset_cursor();
+                        break;
+                }
+            }
+        }, word);
     }
 
     return newlines + 1;
@@ -436,60 +435,59 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
 
     for (int i = 0; i < ds.size(); ++i) {
         if (!last_line) {
-            std::visit(
-                Overload{
-                    [&](const std::vector<DispGlyph>& dgs) {
-                        auto wchars = dgs_to_wstring(dgs);
-                        const auto word_width = std::ranges::fold_left(
-                            dgs, 0.0f,
-                            [](const float w, const DispGlyph& dg) {
-                                return w + dg.advance;
-                            });
-                        if (word_width > bounds.width) {
-                            // if whole word is longer than box, wrap it
-                            auto split = split_displayable(dgs, bounds.width);
-                            for (const auto &split_dgs : split) {
-                                for (const auto &dg : split_dgs) {
-                                    draw_glyph(dg);
-                                }
-                                reset_cursor();
-                                just_wrapped = true;
+            std::visit(Overload {
+                [&](const std::vector<DispGlyph>& dgs) {
+                    auto wchars = dgs_to_wstring(dgs);
+                    const auto word_width = std::ranges::fold_left(
+                        dgs, 0.0f,
+                        [](const float w, const DispGlyph& dg) {
+                            return w + dg.advance;
+                        });
+                    if (word_width > bounds.width) {
+                        // if whole word is longer than box, wrap it
+                        auto split = split_displayable(dgs, bounds.width);
+                        for (const auto &split_dgs : split) {
+                            for (const auto &dg : split_dgs) {
+                                draw_glyph(dg);
                             }
-                        } else if (word_width + cursor_x >= bounds.x + bounds.width) {
-                            // if word goes beyond box, push to next line
                             reset_cursor();
-                            if (!last_line) {
-                                for (const auto &dg : dgs) {
-                                    draw_glyph(dg);
-                                }
-                            }
-                        } else {
-                            // otherwise, draw normally
+                            just_wrapped = true;
+                        }
+                    } else if (word_width + cursor_x >= bounds.x + bounds.width) {
+                        // if word goes beyond box, push to next line
+                        reset_cursor();
+                        if (!last_line) {
                             for (const auto &dg : dgs) {
                                 draw_glyph(dg);
                             }
                         }
-
-                        just_wrapped = false;
-                    },
-                    [&](const WSpaceType& ws) {
-                        switch (ws) {
-                            case WSpaceType::Space:
-                                if (!just_wrapped) {
-                                    draw_glyph(space_glyph);
-                                }
-                                break;
-                            case WSpaceType::Tab:
-                                for (int i = 0; i < 4; ++i) {
-                                    draw_glyph(space_glyph);
-                                }
-                                break;
-                            case WSpaceType::Newline:
-                                reset_cursor();
-                                break;
+                    } else {
+                        // otherwise, draw normally
+                        for (const auto &dg : dgs) {
+                            draw_glyph(dg);
                         }
                     }
-                }, ds.at(i));
+
+                    just_wrapped = false;
+                },
+                [&](const WSpaceType& ws) {
+                    switch (ws) {
+                        case WSpaceType::Space:
+                            if (!just_wrapped) {
+                                draw_glyph(space_glyph);
+                            }
+                            break;
+                        case WSpaceType::Tab:
+                            for (int i = 0; i < 4; ++i) {
+                                draw_glyph(space_glyph);
+                            }
+                            break;
+                        case WSpaceType::Newline:
+                            reset_cursor();
+                            break;
+                    }
+                }
+            }, ds.at(i));
         }
         if (last_line) {
             continue_idx = i;
@@ -500,7 +498,7 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
     if (continue_idx) {
         std::vector<DispGlyph> dgs;
         for (int j = *continue_idx; j < ds.size(); ++j) {
-            std::visit(Overload{
+            std::visit(Overload {
                 [&](const std::vector<DispGlyph>& new_dgs) {
                     dgs.insert(dgs.end(), new_dgs.begin(), new_dgs.end());
                 },
@@ -542,61 +540,6 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
     return {newlines + 1, chop};
 }
 
-// auto TextHelper::draw_displayable_g_by_g(const Displayable& disp, raylib::Vector2 pos, float max_width) -> std::tuple<float, bool, int>{
-//     auto cursor_x = pos.x;
-//     auto cursor_y = pos.y;
-//
-//     bool chopped = false;
-//     int last_codepoint;
-//
-//     auto draw_glyph = [&](const DispGlyph& glyph) {
-//         const auto font = font_ptr(glyph.style.font);
-//         const auto cp = glyph.codepoint;
-//         const auto color = glyph.style.fg;
-//         DrawTextCodepoint(*font, cp, {cursor_x, cursor_y}, font_size, color);
-//         cursor_x += glyph.advance;
-//         if (cursor_x >= max_width) {
-//             chopped = true;
-//         }
-//     };
-//
-//     std::visit(Overload {
-//         [&](const std::vector<DispGlyph>& dgs) {
-//             for (const auto &dg : dgs) {
-//                 if (cursor_x + dg.advance < max_width) {
-//                     draw_glyph(dg);
-//                     last_codepoint = dg.codepoint;
-//                     if (chopped) {
-//                         break;
-//                     }
-//                 }
-//             }
-//         },
-//         [&](const WSpaceType &ws) {
-//             switch (ws) {
-//                 case WSpaceType::Space:
-//                     draw_glyph(space_glyph);
-//                     last_codepoint = space_glyph.codepoint;
-//                     break;
-//                 case WSpaceType::Tab:
-//                     for (int i = 0; i < 4; ++i) {
-//                         draw_glyph(space_glyph);
-//                         if (chopped) {
-//                             break;
-//                         }
-//                     }
-//                     last_codepoint = space_glyph.codepoint;
-//                     break;
-//                 case WSpaceType::Newline:
-//                     last_codepoint = '\n';
-//                     chopped = true;
-//             }
-//         }
-//     }, disp);
-//
-//     return {cursor_x, chopped, last_codepoint};
-// }
-
 auto TextHelper::text_width(const std::string_view text) -> float {
     const auto [ds, _] = into_displayables(text);
     float cursor_x = 0.0f;
@@ -621,36 +564,35 @@ auto TextHelper::text_width(const std::string_view text) -> float {
     };
 
     for (const auto& word : ds) {
-        std::visit(
-            Overload{
-                [&](const std::vector<DispGlyph>& dgs) {
-                    for (const auto &dg : dgs) {
-                        dummy_draw(dg);
-                    }
-                    just_wrapped = false;
-                },
-                [&](const WSpaceType& ws) {
-                    switch (ws) {
-                        case WSpaceType::Space:
-                            if (!just_wrapped) {
-                                dummy_draw(space_glyph);
-                            }
-                            break;
-                        case WSpaceType::Tab:
-                            for (int i = 0; i < 4; ++i) {
-                                dummy_draw(space_glyph);
-                            }
-                            break;
-                        case WSpaceType::Newline:
-                            reset_cursor();
-                            break;
-                    }
-                },
-                [&](auto &&) {
-                    assert(false);
-                    std::unreachable();
+        std::visit(Overload {
+            [&](const std::vector<DispGlyph>& dgs) {
+                for (const auto &dg : dgs) {
+                    dummy_draw(dg);
                 }
-            }, word);
+                just_wrapped = false;
+            },
+            [&](const WSpaceType& ws) {
+                switch (ws) {
+                    case WSpaceType::Space:
+                        if (!just_wrapped) {
+                            dummy_draw(space_glyph);
+                        }
+                        break;
+                    case WSpaceType::Tab:
+                        for (int i = 0; i < 4; ++i) {
+                            dummy_draw(space_glyph);
+                        }
+                        break;
+                    case WSpaceType::Newline:
+                        reset_cursor();
+                        break;
+                }
+            },
+            [&](auto &&) {
+                assert(false);
+                std::unreachable();
+            }
+        }, word);
     }
 
     return width;
@@ -678,44 +620,43 @@ auto TextHelper::text_height(const std::string_view text, const int width, const
     };
 
     for (const auto& word : ds) {
-        std::visit(
-            Overload{
-                [&](const std::vector<DispGlyph>& dgs) {
-                    const auto word_width = std::ranges::fold_left(
-                        dgs, 0.0,
-                        [](const float w, const DispGlyph& dg) {
-                            return w + dg.advance;
-                        });
-                    if (word_width + cursor_x > f_width) {
-                        reset_cursor();
-                    }
-                    for (const auto &dg : dgs) {
-                        dummy_draw(dg);
-                    }
-                    just_wrapped = false;
-                },
-                [&](const WSpaceType& ws) {
-                    switch (ws) {
-                        case WSpaceType::Space:
-                            if (!just_wrapped) {
-                                dummy_draw(space_glyph);
-                            }
-                            break;
-                        case WSpaceType::Tab:
-                            for (int i = 0; i < 4; ++i) {
-                                dummy_draw(space_glyph);
-                            }
-                            break;
-                        case WSpaceType::Newline:
-                            reset_cursor();
-                            break;
-                    }
-                },
-                [&](auto &&) {
-                    assert(false);
-                    std::unreachable();
+        std::visit(Overload {
+            [&](const std::vector<DispGlyph>& dgs) {
+                const auto word_width = std::ranges::fold_left(
+                    dgs, 0.0,
+                    [](const float w, const DispGlyph& dg) {
+                        return w + dg.advance;
+                    });
+                if (word_width + cursor_x > f_width) {
+                    reset_cursor();
                 }
-            }, word);
+                for (const auto &dg : dgs) {
+                    dummy_draw(dg);
+                }
+                just_wrapped = false;
+            },
+            [&](const WSpaceType& ws) {
+                switch (ws) {
+                    case WSpaceType::Space:
+                        if (!just_wrapped) {
+                            dummy_draw(space_glyph);
+                        }
+                        break;
+                    case WSpaceType::Tab:
+                        for (int i = 0; i < 4; ++i) {
+                            dummy_draw(space_glyph);
+                        }
+                        break;
+                    case WSpaceType::Newline:
+                        reset_cursor();
+                        break;
+                }
+            },
+            [&](auto &&) {
+                assert(false);
+                std::unreachable();
+            }
+        }, word);
     }
 
     if (newlines == 0) {

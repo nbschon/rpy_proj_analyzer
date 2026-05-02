@@ -271,6 +271,18 @@ auto Lexer::tokenize() -> std::vector<Token> {
         { "easeout", Warper::EaseOut },
     };
 
+    static const std::unordered_map<std::string, Event> atl_events = {
+        { "start", Event::Start },
+        { "replace", Event::Replace },
+        { "replaced", Event::Replaced },
+        { "hover", Event::Hover },
+        { "idle", Event::Idle },
+        { "selected_hover", Event::SelectedHover },
+        { "selected_idle", Event::SelectedIdle },
+        { "insensitive", Event::Insensitive },
+        { "selected_insensitive", Event::SelectedInsensitive },
+    };
+
     std::string txt_buff;
     while (peek()) {
         if (std::isalpha(*peek()) != 0) {
@@ -319,8 +331,8 @@ auto Lexer::tokenize() -> std::vector<Token> {
                 tokens.emplace_back(TokDefault{line, new_col, indent_level});
             } else if (txt_buff == "define") {
                 tokens.emplace_back(TokDefine{line, new_col, indent_level});
-            } else if (txt_buff == "set") {
-                tokens.emplace_back(TokSet{line, new_col, indent_level});
+            // } else if (txt_buff == "set") {
+            //     tokens.emplace_back(TokSet{line, new_col, indent_level});
             } else if (txt_buff == "play") {
                 tokens.emplace_back(TokPlay{line, new_col, indent_level});
             } else if (txt_buff == "music") {
@@ -388,6 +400,9 @@ auto Lexer::tokenize() -> std::vector<Token> {
             } else if (atl_warpers.contains(txt_buff)) {
                 const auto warper = atl_warpers.at(txt_buff);
                 tokens.emplace_back(TokATLWarper{line, new_col, indent_level, warper});
+            } else if (atl_events.contains(txt_buff)) {
+                const auto event = atl_events.at(txt_buff);
+                tokens.emplace_back(TokATLEvent{line, new_col, indent_level, event});
             } else {
                 tokens.emplace_back(TokIdent{line, new_col, indent_level, txt_buff});
             }
@@ -581,6 +596,9 @@ void Lexer::print_tokens(const unsigned n_lines) const {
 
 auto Lexer::operator++() -> unsigned& {
     idx++;
+    // if (idx >= tokens.size()) {
+    //     idx--;
+    // }
     return idx;
 }
 
