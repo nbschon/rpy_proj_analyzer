@@ -14,13 +14,52 @@
 #include <print>
 #include <span>
 #include <string_view>
-#include <tuple>
 #include <utility>
 #include <variant>
 
 class TextHelper {
 public:
-    static inline raylib::Color default_color;
+    static inline std::unique_ptr<raylib::Color> default_color;
+
+    struct Style {
+        raylib::Color fg = *default_color;
+        std::uint8_t font = 0;
+
+        void reset() {
+            fg = *default_color;
+            font = 0;
+        }
+    };
+
+    struct DispGlyph {
+        int codepoint = 0;
+        Style style{};
+        float advance = 0.0f;
+
+        DispGlyph(const int codepoint, const Style style) {
+            this->codepoint = codepoint;
+            this->style = style;
+            advance = 0.0f;
+        }
+        DispGlyph(const int codepoint, const Style style, const float advance) {
+            this->codepoint = codepoint;
+            this->style = style;
+            this->advance = advance;
+        }
+    };
+
+    enum class WSpaceType : std::uint8_t {
+        Space,
+        Tab,
+        Newline,
+    };
+
+    using Displayable = std::variant<WSpaceType, std::vector<DispGlyph>>;
+
+    struct DispText {
+        std::vector<Displayable> text;
+        float width;
+    };
 
 private:
     static constexpr std::uint8_t BOLD      = 0b1;
@@ -34,37 +73,9 @@ private:
     template<class... Ts>
     Overload(Ts...) -> Overload<Ts...>;
 
-    struct Style {
-        raylib::Color fg = default_color;
-        std::uint8_t font = 0;
-
-        void reset() {
-            fg = default_color;
-            font = 0;
-        }
-    };
-
-    struct DispChar {
-        int codepoint = 0;
-        Style style{};
-    };
-
-    struct DispGlyph {
-        int codepoint = 0;
-        Style style{};
-        float advance = 0;
-    };
-
-    enum class WSpaceType {
-        Space,
-        Tab,
-        Newline,
-    };
-
-    using Displayable = std::variant<WSpaceType, std::vector<DispGlyph>>;
-
     static inline std::array<std::unique_ptr<raylib::Font>, ((BOLD | ITALIC) + 1)> fonts{};
-    static inline DispGlyph space_glyph{0, {raylib::Color::Blank(), 0}, 0};
+    static inline std::unique_ptr<DispGlyph> space_glyph;
+    static inline std::unique_ptr<DispText> cont_text;
     static inline bool loaded_fonts = false;
     static inline float font_spacing = 2.0f;
 
@@ -72,7 +83,7 @@ private:
         return (i == ' ' || i == '\t' || i == '\n');
     };
 
-    static auto font_ptr (const std::uint8_t &font) -> raylib::Font* {
+    static auto font_ptr(const std::uint8_t &font) -> raylib::Font* {
         raylib::Font* ptr = fonts.at(font).get();
         if (ptr->texture.id == 0) {
             *ptr = GetFontDefault();
@@ -82,15 +93,17 @@ private:
 
     static auto color_from_hex(std::string_view hex_str, std::uint8_t alpha_mod = 0xFF) -> std::optional<raylib::Color>;
 
-    static auto adv_glyph(const DispChar& dg) -> DispGlyph;
+    static auto adv_glyph(DispGlyph& glyph) -> void;
 
-    static auto consume_tag(std::string_view s, std::size_t i, Style& style) -> int;
+    static auto consume_tag(std::string_view str, std::size_t idx, Style& style) -> int;
 
-    static auto codepoint(std::string_view s, std::size_t i) -> std::pair<int, int>;
+    /**
+     * @brief returns the font codepoint for an index in a given string
+     * @return the codepoint and its size in bytes
+     */
+    static auto codepoint(std::string_view str, std::size_t idx) -> std::pair<int, int>;
 
-    static auto apply_formatting(std::string_view input) -> std::vector<DispChar>;
-
-    static auto into_displayables(std::string_view input) -> std::pair<std::vector<Displayable>, float>;
+    static auto apply_formatting(std::string_view input) -> std::vector<DispGlyph>;
 
     static auto dgs_to_wstring(const std::vector<DispGlyph> &disp) -> std::wstring;
 
@@ -109,6 +122,8 @@ public:
     static void load_fonts();
     static void unload_fonts();
 
+    static auto into_disp_text(std::string_view input) -> DispText;
+
     /*
      * All text drawing functions and the style
      * parsing are adapted from the following:
@@ -116,15 +131,18 @@ public:
      * https://www.raylib.com/examples/text/loader.html?name=text_rectangle_bounds
      */
     static auto draw_text(std::string_view text, raylib::Vector2 pos, int width = 0, int rel_line = 0) -> int;
+    static auto draw_text(const DispText &text, raylib::Vector2 pos, int width = 0, int rel_line = 0) -> int;
 
-    static auto draw_text_constrained(std::string_view text, raylib::Rectangle bounds, int rel_line = 0, std::string_view cont = "(...)")
+    static auto draw_text_constrained(std::string_view text, raylib::Rectangle bounds, int rel_line = 0)
+        -> std::pair<int, bool>;
+    static auto draw_text_constrained(const DispText &text, raylib::Rectangle bounds, int rel_line = 0)
         -> std::pair<int, bool>;
 
-    // static auto draw_displayable_g_by_g(const Displayable &disp, raylib::Vector2 pos, float max_width = 0.0f) -> std::tuple<float, bool, int>;
-
     static auto text_width(std::string_view text) -> float;
+    static auto text_width(const DispText &text) -> float;
 
     static auto text_height(std::string_view text, int width, float offset = 0.0f) -> float;
+    static auto text_height(const DispText &text, int width, float offset = 0.0f) -> float;
 };
 
 

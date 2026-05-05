@@ -67,7 +67,9 @@ class DisplayNode {
 
     static constexpr float line_height = 20;
     std::string title;
+    TextHelper::DispText title_text;
     std::vector<std::string> fields;
+    std::vector<TextHelper::DispText> fields_text;
 
     bool hovered = false;
     std::optional<std::chrono::steady_clock::time_point> hover_start;
@@ -85,8 +87,6 @@ class DisplayNode {
     static constexpr float width = 400.0f;
     static constexpr float height = TextHelper::font_size * 5.0f;
 
-    // static auto args_to_spacing(std::span<const float> args) -> Spacing;
-
 public:
     static inline raylib::Color default_color;
     static inline raylib::Color line_color;
@@ -97,8 +97,6 @@ public:
      */
     static inline Spacing margin{10.0f};
     static inline Spacing padding{10.0f};
-    // static constexpr unsigned padding = 10;
-    // static constexpr unsigned margin = 10;
 
     raylib::Rectangle margin_box{};
     raylib::Rectangle padding_box{};

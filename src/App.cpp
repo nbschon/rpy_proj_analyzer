@@ -35,7 +35,8 @@ auto App::run() -> int {
 
     DisplayNode::default_color = ArgVParser::dark_mode() ? raylib::Color(0x14, 0x18, 0x1F) : raylib::Color(0xE2, 0xE2, 0xE2);
     DisplayNode::line_color = ArgVParser::dark_mode() ? raylib::Color::White() : raylib::Color::Black();
-    TextHelper::default_color = ArgVParser::dark_mode() ? raylib::Color::White() : raylib::Color::Black();
+    TextHelper::default_color = std::make_unique<raylib::Color>(
+        ArgVParser::dark_mode() ? raylib::Color::White() : raylib::Color::Black());
     TextHelper::load_fonts();
     raylib::Image dir_img("./img/icons/directory.png");
     const auto new_color = ArgVParser::dark_mode() ? raylib::Color::White() : raylib::Color::Black();

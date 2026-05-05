@@ -5,6 +5,7 @@
 #include "DisplayNode.hpp"
 
 #include <algorithm>
+#include <ranges>
 
 #include "raylib-cpp.hpp"
 
@@ -23,10 +24,10 @@ void DisplayNode::setup_texture() const {
         tex_box.Draw(raylib::Color(0xE2, 0xE2, 0xE2));
         tex_box.DrawLines(raylib::Color::Black());
 
-        auto offset = TextHelper::draw_text(title, {title_x, 0}, tex_box.width);
+        auto offset = TextHelper::draw_text(title_text, {title_x, 0}, tex_box.width);
 
         if (!fields.empty()) {
-            for (const auto &field : fields) {
+            for (const auto &field : fields_text) {
                 const auto [lines, chop] = TextHelper::draw_text_constrained(field, tex_box, offset);
                 offset += lines;
                 if (chop) {
@@ -53,71 +54,27 @@ void DisplayNode::setup_dimensions() {
     padding_box.width -= (padding.t + padding.b);
     padding_box.height -= (padding.l + padding.r);
 
-    const auto text_width = TextHelper::text_width(this->title);
+    const auto text_width = TextHelper::text_width(this->title_text);
     const float title_x = padding_box.x + (padding_box.width / 2 - text_width / 2);
     title_coords = raylib::Vector2(title_x, padding_box.y);
-
-    // default_color = raylib::Color(0xe2e2e2ff);
 }
 
-// auto DisplayNode::args_to_spacing(const std::span<const float> args) -> Spacing {
-//     switch (args.size()) {
-//         case 0:
-//             return {0.0f, 0.0f, 0.0f, 0.0f};
-//         case 1: {
-//             const auto all = args[0];
-//             return {all, all, all, all};
-//         }
-//         case 2: {
-//             const auto v = args[0];
-//             const auto h = args[1];
-//             return {v, h, v, h};
-//         }
-//         case 3: {
-//             const auto t = args[0];
-//             const auto sides = args[1];
-//             const auto b = args[2];
-//             return {t, sides, b, sides};
-//         }
-//         default: {
-//             const auto t = args[0];
-//             const auto r = args[1];
-//             const auto b = args[2];
-//             const auto l = args[3];
-//             return {t, r, b, l};
-//         }
-//     }
-// }
-
 DisplayNode::DisplayNode(const Node* node, const raylib::Rectangle rect, std::string title)
-    : title(std::move(title)), fields({}), underlying(node), margin_box(rect) {
-
-    // main_box = margin_box;
-    // main_box.x += margin;
-    // main_box.y += margin;
-    // main_box.width -= (margin * 2);
-    // main_box.height -= (margin * 2);
-    // padding_box = main_box;
-    // padding_box.x += padding;
-    // padding_box.y += padding;
-    // padding_box.width -= (padding * 2);
-    // padding_box.height -= (padding * 2);
-    //
-    // const auto text_width = TextHelper::text_width(this->title);
-    // const float title_x = padding_box.x + (padding_box.width / 2 - text_width / 2);
-    // title_coords = raylib::Vector2(title_x, padding_box.y);
-    // color = raylib::Color(0xe2e2e2ff);
-    // texture = raylib::RenderTexture2D(width, height);
-    // setup_texture();
+    : title(std::move(title)), fields({}), underlying(node), margin_box(rect),
+    title_text(TextHelper::into_disp_text(this->title)), fields_text({}) {
     setup_dimensions();
 }
 
 DisplayNode::DisplayNode(const Node* node, const raylib::Rectangle rect, std::string title, std::vector<std::string> fields)
-    : title(std::move(title)), fields(std::move(fields)), underlying(node), margin_box(rect) {
+    : title(std::move(title)), title_text(TextHelper::into_disp_text(this->title)), fields(std::move(fields)),
+    fields_text(this->fields | std::views::transform([&](const std::string &txt) -> TextHelper::DispText {
+          return TextHelper::into_disp_text(txt);
+      }) | std::ranges::to<std::vector<TextHelper::DispText>>()),
+    underlying(node), margin_box(rect) {
     setup_dimensions();
 }
 
-bool DisplayNode::is_mouse_hovering(const raylib::Camera2D &cam) {
+auto DisplayNode::is_mouse_hovering(const raylib::Camera2D &cam) -> bool {
     Vector2 curr_mouse_pos = GetScreenToWorld2D(GetMousePosition(), cam);
     hovered = padding_box.CheckCollision(curr_mouse_pos);
     if (hovered) {
@@ -141,10 +98,10 @@ auto DisplayNode::draw() const -> std::optional<std::string> {
         main_box.DrawLines(line_color);
     }
 
-    auto offset = TextHelper::draw_text(title, title_coords, static_cast<int>(padding_box.width));
+    auto offset = TextHelper::draw_text(title_text, title_coords, static_cast<int>(padding_box.width));
     if (!fields.empty()) {
-        for (const auto &field : fields) {
-            const auto [lines, did_chop] = TextHelper::draw_text_constrained(field, padding_box, offset, "...\"");
+        for (const auto &field : fields_text) {
+            const auto [lines, did_chop] = TextHelper::draw_text_constrained(field, padding_box, offset);
             offset += lines;
             if (did_chop) {
                 break;
@@ -154,7 +111,6 @@ auto DisplayNode::draw() const -> std::optional<std::string> {
 
     if (hover_start && mouse_pos) {
         if (std::chrono::steady_clock::now() - *hover_start > std::chrono::seconds(1)) {
-            constexpr auto box_height = 60.0f;
             auto [line, col] = underlying->line_and_col();
             auto text = std::format("Line:     {:>4}\nColumn:   {:>4}", line, col);
             return text;

@@ -71,11 +71,11 @@ auto TextHelper::color_from_hex(const std::string_view hex_str, const std::uint8
     return ret_col;
 }
 
-auto TextHelper::adv_glyph(const DispChar& dg) -> DispGlyph {
-    const auto font = font_ptr(dg.style.font);
+auto TextHelper::adv_glyph(DispGlyph& glyph) -> void {
+    const auto *font = font_ptr(glyph.style.font);
 
     const float scale = font_size / static_cast<float>(font->baseSize);
-    const auto glyph_idx = GetGlyphIndex(*font, dg.codepoint);
+    const auto glyph_idx = GetGlyphIndex(*font, glyph.codepoint);
 
     float adv = 0.0f;
     if (font->glyphs[glyph_idx].advanceX == 0) {
@@ -84,36 +84,35 @@ auto TextHelper::adv_glyph(const DispChar& dg) -> DispGlyph {
         adv = static_cast<float>(font->glyphs[glyph_idx].advanceX) * scale;
     }
 
-    return {dg.codepoint, dg.style, adv};
+    glyph.advance = adv;
 }
 
-auto TextHelper::consume_tag(const std::string_view s, const std::size_t i, Style& style) -> int {
-    if (i >= s.length() || s.at(i) != '{') {
+auto TextHelper::consume_tag(const std::string_view str, const std::size_t idx, Style& style) -> int {
+    if (idx >= str.length() || str.at(idx) != '{') {
         return 0;
     }
-    if (i != 0 && s.at(i - 1) == '\\') {
+    if (idx != 0 && str.at(idx - 1) == '\\') {
         return 1;
     }
 
-    int curr_pos = static_cast<int>(i + 1);
+    int curr_pos = static_cast<int>(idx + 1);
     std::string tag_buff;
 
-    while (curr_pos < s.length() && s.at(curr_pos) != '}') {
-        tag_buff += s.at(curr_pos);
+    while (curr_pos < str.length() && str.at(curr_pos) != '}') {
+        tag_buff += str.at(curr_pos);
         curr_pos++;
     }
-    if (curr_pos < s.length() && s.at(curr_pos) == '}') {
+    if (curr_pos < str.length() && str.at(curr_pos) == '}') {
         curr_pos++;
     }
 
-    const int idx = static_cast<int>(i);
-    if (constexpr std::string_view tag = "color=#"; tag_buff.starts_with(tag)) {
-        const std::string_view color(tag_buff.data() + tag.length());
+    if (constexpr std::string_view color_tag = "color=#"; tag_buff.starts_with(color_tag)) {
+        const std::string_view color(tag_buff.data() + color_tag.length());
         if (const auto rl_col = color_from_hex(color)) {
             style.fg = *rl_col;
-            return curr_pos - idx;
+            return curr_pos - static_cast<int>(idx);
         }
-    } else if (constexpr std::string_view t = "/color"; t == tag_buff) {
+    } else if (constexpr std::string_view tag = "/color"; tag == tag_buff) {
         style.fg = raylib::Color::Black();
     } else if (tag_buff == "b") {
         style.font |= BOLD;
@@ -124,61 +123,59 @@ auto TextHelper::consume_tag(const std::string_view s, const std::size_t i, Styl
     } else if (tag_buff == "/i") {
         style.font &= ~ITALIC;
     } else {
-        // std::println(std::cerr, "Warning: Unknown / unsupported tag \"{{tag_buff}}\"");
         return 0;
     }
 
-    return curr_pos - idx;
+    return curr_pos - static_cast<int>(idx);
 }
 
-auto TextHelper::codepoint(const std::string_view s, const std::size_t i) -> std::pair<int, int> {
+auto TextHelper::codepoint(const std::string_view str, const std::size_t idx) -> std::pair<int, int> {
     int bytes = 0;
-    int codepoint = GetCodepointNext(s.data() + i, &bytes);
+    int codepoint = GetCodepointNext(str.data() + idx, &bytes);
     if (bytes <= 0) {
         return {'?', 1};
     }
     return {codepoint, bytes};
 }
 
-auto TextHelper::apply_formatting(const std::string_view input) -> std::vector<DispChar> {
+auto TextHelper::apply_formatting(const std::string_view input) -> std::vector<DispGlyph> {
     Style style{};
-    std::vector<DispChar> styled_chars;
-    int i = 0;
-    while (i < input.length()) {
-        if (input.at(i) == '{') {
-            if (const int consumed = consume_tag(input, i, style); consumed > 0) {
-                i += consumed;
+    std::vector<DispGlyph> styled_chars;
+    int idx = 0;
+    while (idx < input.length()) {
+        if (input.at(idx) == '{') {
+            if (const int consumed = consume_tag(input, idx, style); consumed > 0) {
+                idx += consumed;
             } else {
                 styled_chars.emplace_back('{', style);
-                i += 1;
+                idx += 1;
             }
         } else {
-            auto [point, bytes] = codepoint(input, i);
+            auto [point, bytes] = codepoint(input, idx);
             styled_chars.emplace_back(point, style);
-            i += bytes;
+            idx += bytes;
         }
     }
     style.reset();
     return styled_chars;
 }
 
-auto TextHelper::into_displayables(const std::string_view input) -> std::pair<std::vector<Displayable>, float> {
+auto TextHelper::into_disp_text(const std::string_view input) -> DispText {
     auto formatted = apply_formatting(input);
     std::vector<Displayable> disp_buff;
     float width = 0.0f;
 
-    int i = 0;
-    while (i < formatted.size()) {
-        const auto& [codepoint, style] = formatted.at(i);
-        if (const auto cp = codepoint; is_space(cp)) {
-            switch (cp) {
+    int idx = 0;
+    while (idx < formatted.size()) {
+        if (const auto& [codepoint, style, adv] = formatted.at(idx); is_space(codepoint)) {
+            switch (codepoint) {
                 case ' ':
                     disp_buff.emplace_back(WSpaceType::Space);
-                    width += space_glyph.advance;
+                    width += space_glyph->advance;
                     break;
                 case '\t':
                     disp_buff.emplace_back(WSpaceType::Tab);
-                    width += space_glyph.advance * 4;
+                    width += space_glyph->advance * 4;
                     break;
                 case '\n':
                     disp_buff.emplace_back(WSpaceType::Newline);
@@ -186,31 +183,31 @@ auto TextHelper::into_displayables(const std::string_view input) -> std::pair<st
                 default:
                     std::unreachable();
             }
-            i++;
+            idx++;
         } else {
             std::vector<DispGlyph> dc_word;
             float word_width = 0.0f;
-            while (i < formatted.size() && !is_space(formatted.at(i).codepoint)) {
-                dc_word.push_back(adv_glyph(formatted.at(i)));
+            while (idx < formatted.size() && !is_space(formatted.at(idx).codepoint)) {
+                adv_glyph(formatted.at(idx));
+                dc_word.push_back(formatted.at(idx));
                 word_width += dc_word.back().advance;
-                i++;
+                idx++;
             }
             width += word_width;
             disp_buff.emplace_back(std::move(dc_word));
         }
     }
 
-    return {disp_buff, width};
+    return {.text=disp_buff, .width=width};
 }
 
 auto TextHelper::dgs_to_wstring(const std::vector<DispGlyph> &dgs) -> std::wstring {
     std::wstring as_chars;
 
-    int i = 0;
-    while (i < dgs.size()) {
-        const auto& [codepoint, style, adv] = dgs.at(i);
-        if (const auto cp = codepoint; is_space(cp)) {
-            switch (cp) {
+    int idx = 0;
+    while (idx < dgs.size()) {
+        if (const auto& [codepoint, style, adv] = dgs.at(idx); is_space(codepoint)) {
+            switch (codepoint) {
                 case ' ':
                 case '\t':
                 case '\n':
@@ -219,17 +216,18 @@ auto TextHelper::dgs_to_wstring(const std::vector<DispGlyph> &dgs) -> std::wstri
                 default:
                     std::unreachable();
             }
-            i++;
+            idx++;
         } else {
-            while (i < dgs.size() && !is_space(dgs.at(i).codepoint)) {
-                as_chars.push_back(static_cast<wchar_t>(dgs.at(i).codepoint));
-                i++;
+            while (idx < dgs.size() && !is_space(codepoint)) {
+                as_chars.push_back(static_cast<wchar_t>(codepoint));
+                idx++;
             }
         }
     }
 
     return as_chars;
 }
+
 auto TextHelper::split_displayable(const std::vector<DispGlyph> &disp, const float max_width) -> std::vector<std::span<const DispGlyph>> {
     float curr_width = 0.0f;
     int left = 0;
@@ -269,23 +267,21 @@ auto TextHelper::chop_displayable(const std::vector<DispGlyph>& disp, float max_
 
     }
 
-    // if (count > disp.size()) {
-    //     return disp;
-    // }
-
     return all.subspan(0, count);
 }
 
 void TextHelper::load_fonts() {
     try {
+        constexpr int FONT_SIZE = 64;
+        constexpr int CHAR_COUNT = 250;
         fonts.at(0) =
-            std::make_unique<raylib::Font>("./fonts/LiberationMono-Regular.ttf", 64, nullptr, 250);
+            std::make_unique<raylib::Font>("./fonts/LiberationMono-Regular.ttf", FONT_SIZE, nullptr, CHAR_COUNT);
         fonts.at(BOLD) =
-            std::make_unique<raylib::Font>("./fonts/LiberationMono-Bold.ttf", 64, nullptr, 250);
+            std::make_unique<raylib::Font>("./fonts/LiberationMono-Bold.ttf", FONT_SIZE, nullptr, CHAR_COUNT);
         fonts.at(ITALIC) =
-            std::make_unique<raylib::Font>("./fonts/LiberationMono-Italic.ttf", 64, nullptr, 250);
+            std::make_unique<raylib::Font>("./fonts/LiberationMono-Italic.ttf", FONT_SIZE, nullptr, CHAR_COUNT);
         fonts.at(BOLD | ITALIC) =
-            std::make_unique<raylib::Font>("./fonts/LiberationMono-BoldItalic.ttf", 64, nullptr, 250);
+            std::make_unique<raylib::Font>("./fonts/LiberationMono-BoldItalic.ttf", FONT_SIZE, nullptr, CHAR_COUNT);
 
         for (const auto& font : fonts) {
             SetTextureFilter(font->texture, TEXTURE_FILTER_BILINEAR);
@@ -300,7 +296,10 @@ void TextHelper::load_fonts() {
         font_spacing = 6.0f;
     }
 
-    space_glyph = adv_glyph({codepoint(" ", 0).first, Style{}});
+    DispGlyph glyph(codepoint(" ", 0).first, Style{});
+    adv_glyph(glyph);
+    space_glyph = std::make_unique<DispGlyph>(glyph);
+    cont_text = std::make_unique<DispText>(into_disp_text("(...)"));
 }
 
 void TextHelper::unload_fonts() {
@@ -309,8 +308,12 @@ void TextHelper::unload_fonts() {
     }
 }
 
-auto TextHelper::draw_text(const std::string_view text, const raylib::Vector2 pos, const int width, const int rel_line) -> int {
-    const auto [ds, _] = into_displayables(text);
+auto TextHelper::draw_text(const std::string_view text, raylib::Vector2 pos, int width, int rel_line) -> int {
+    return draw_text(into_disp_text(text), pos, width, rel_line);
+}
+
+auto TextHelper::draw_text(const DispText &text, const raylib::Vector2 pos, const int width, const int rel_line) -> int {
+    const auto &[ds, _] = text;
 
     constexpr float line_height = font_size;
     float cursor_x = pos.x;
@@ -319,10 +322,13 @@ auto TextHelper::draw_text(const std::string_view text, const raylib::Vector2 po
     int newlines = 0;
 
     auto draw_glyph = [&](const DispGlyph& glyph) {
-        const auto font = font_ptr(glyph.style.font);
-        const auto cp = glyph.codepoint;
-        const auto color = glyph.style.fg;
-        DrawTextCodepoint(*font, cp, {cursor_x, cursor_y}, font_size, color);
+        DrawTextCodepoint(
+            *font_ptr(glyph.style.font),
+            glyph.codepoint,
+            {cursor_x, cursor_y},
+            font_size,
+            glyph.style.fg
+        );
         cursor_x += glyph.advance;
     };
 
@@ -370,12 +376,12 @@ auto TextHelper::draw_text(const std::string_view text, const raylib::Vector2 po
                 switch (ws) {
                     case WSpaceType::Space:
                         if (!just_wrapped) {
-                            draw_glyph(space_glyph);
+                            draw_glyph(*space_glyph);
                         }
                         break;
                     case WSpaceType::Tab:
                         for (int i = 0; i < 4; ++i) {
-                            draw_glyph(space_glyph);
+                            draw_glyph(*space_glyph);
                         }
                         break;
                     case WSpaceType::Newline:
@@ -389,10 +395,14 @@ auto TextHelper::draw_text(const std::string_view text, const raylib::Vector2 po
     return newlines + 1;
 }
 
-auto TextHelper::draw_text_constrained(const std::string_view text, const raylib::Rectangle bounds, const int rel_line, const std::string_view cont)
+auto TextHelper::draw_text_constrained(const std::string_view text, const raylib::Rectangle bounds, const int rel_line) -> std::pair<int, bool> {
+    return draw_text_constrained(into_disp_text(text), bounds, rel_line);
+}
+
+auto TextHelper::draw_text_constrained(const DispText &text, const raylib::Rectangle bounds, const int rel_line)
     -> std::pair<int, bool> {
-    const auto [ds, _] = into_displayables(text);
-    const auto [cont_d, cont_width] = into_displayables(cont);
+    const auto &[ds, _] = text;
+    const auto &[cont_d, cont_width] = *cont_text;
 
     bool last_line = false;
 
@@ -407,10 +417,13 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
     }
 
     auto draw_glyph = [&](const DispGlyph& glyph) {
-        const auto font = font_ptr(glyph.style.font);
-        const auto cp = glyph.codepoint;
-        const auto color = glyph.style.fg;
-        DrawTextCodepoint(*font, cp, {cursor_x, cursor_y}, font_size, color);
+        DrawTextCodepoint(
+            *font_ptr(glyph.style.font),
+            glyph.codepoint,
+            {cursor_x, cursor_y},
+            font_size,
+            glyph.style.fg
+        );
         cursor_x += glyph.advance;
     };
 
@@ -437,7 +450,6 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
         if (!last_line) {
             std::visit(Overload {
                 [&](const std::vector<DispGlyph>& dgs) {
-                    auto wchars = dgs_to_wstring(dgs);
                     const auto word_width = std::ranges::fold_left(
                         dgs, 0.0f,
                         [](const float w, const DispGlyph& dg) {
@@ -474,12 +486,12 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
                     switch (ws) {
                         case WSpaceType::Space:
                             if (!just_wrapped) {
-                                draw_glyph(space_glyph);
+                                draw_glyph(*space_glyph);
                             }
                             break;
                         case WSpaceType::Tab:
                             for (int i = 0; i < 4; ++i) {
-                                draw_glyph(space_glyph);
+                                draw_glyph(*space_glyph);
                             }
                             break;
                         case WSpaceType::Newline:
@@ -505,11 +517,11 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
                 [&](const WSpaceType& ws) {
                     switch (ws) {
                         case WSpaceType::Space:
-                            dgs.push_back(space_glyph);
+                            dgs.push_back(*space_glyph);
                             break;
                         case WSpaceType::Tab:
                             for (int k = 0; k < 4; ++k) {
-                                dgs.push_back(space_glyph);
+                                dgs.push_back(*space_glyph);
                             }
                             break;
                         case WSpaceType::Newline:
@@ -525,7 +537,7 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
                 last_codepoint = dg.codepoint;
             } else {
                 if (is_space(last_codepoint)) {
-                    cursor_x -= space_glyph.advance;
+                    cursor_x -= space_glyph->advance;
                 }
                 chop = true;
                 break;
@@ -533,7 +545,7 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
         }
 
         if (chop) {
-            draw_text(cont, {cursor_x, cursor_y}, bounds.width);
+            draw_text(*cont_text, {cursor_x, cursor_y}, bounds.width);
         }
     }
 
@@ -541,7 +553,11 @@ auto TextHelper::draw_text_constrained(const std::string_view text, const raylib
 }
 
 auto TextHelper::text_width(const std::string_view text) -> float {
-    const auto [ds, _] = into_displayables(text);
+    return text_width(into_disp_text(text));
+}
+
+auto TextHelper::text_width(const DispText &text) -> float {
+    const auto &[ds, _] = text;
     float cursor_x = 0.0f;
     float cursor_y = 0.0f;
     const float line_height = font_size;
@@ -575,12 +591,12 @@ auto TextHelper::text_width(const std::string_view text) -> float {
                 switch (ws) {
                     case WSpaceType::Space:
                         if (!just_wrapped) {
-                            dummy_draw(space_glyph);
+                            dummy_draw(*space_glyph);
                         }
                         break;
                     case WSpaceType::Tab:
                         for (int i = 0; i < 4; ++i) {
-                            dummy_draw(space_glyph);
+                            dummy_draw(*space_glyph);
                         }
                         break;
                     case WSpaceType::Newline:
@@ -588,10 +604,6 @@ auto TextHelper::text_width(const std::string_view text) -> float {
                         break;
                 }
             },
-            [&](auto &&) {
-                assert(false);
-                std::unreachable();
-            }
         }, word);
     }
 
@@ -599,7 +611,11 @@ auto TextHelper::text_width(const std::string_view text) -> float {
 }
 
 auto TextHelper::text_height(const std::string_view text, const int width, const float offset) -> float {
-    const auto [ds, _] = into_displayables(text);
+    return text_height(into_disp_text(text), width, offset);
+}
+
+auto TextHelper::text_height(const DispText &text, const int width, const float offset) -> float {
+    const auto &[ds, _] = text;
 
     const auto f_width = static_cast<float>(width);
     constexpr float line_height = font_size;
@@ -639,12 +655,12 @@ auto TextHelper::text_height(const std::string_view text, const int width, const
                 switch (ws) {
                     case WSpaceType::Space:
                         if (!just_wrapped) {
-                            dummy_draw(space_glyph);
+                            dummy_draw(*space_glyph);
                         }
                         break;
                     case WSpaceType::Tab:
                         for (int i = 0; i < 4; ++i) {
-                            dummy_draw(space_glyph);
+                            dummy_draw(*space_glyph);
                         }
                         break;
                     case WSpaceType::Newline:
@@ -652,10 +668,6 @@ auto TextHelper::text_height(const std::string_view text, const int width, const
                         break;
                 }
             },
-            [&](auto &&) {
-                assert(false);
-                std::unreachable();
-            }
         }, word);
     }
 
