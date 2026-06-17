@@ -9,8 +9,7 @@
 #include <functional>
 #include <unordered_map>
 
-template<class T, class... Ts>
-constexpr bool is_val = (std::is_same_v<T, Ts> || ...);
+#include "Typing.hpp"
 
 void Graph::connect_ancestors() const {
     std::vector<unsigned> parents; // treat like a stack
@@ -118,11 +117,11 @@ auto Graph::assign_scores(const unsigned idx, double curr_score, const OpType op
     //     best = std::max(best, assign_scores(out_idx, curr_score, op));
     // }
 
-    nodes.at(idx)->score_potential = static_cast<int>(best);
+    // nodes.at(idx)->score_potential = static_cast<int>(best);
     return best;
 }
 
-auto Graph::add_show_node(const Tok& t, bool& has_atl, bool is_scene) -> std::unique_ptr<NodeShow> {
+auto Graph::add_show_node(const Tok& tok, bool& has_atl, bool is_scene) -> std::unique_ptr<NodeShow> {
     std::string name;
     std::vector<std::string> attrs;
     ShowProps props{};
@@ -214,7 +213,7 @@ auto Graph::add_show_node(const Tok& t, bool& has_atl, bool is_scene) -> std::un
         --lexer;
     }
 
-    return std::make_unique<NodeShow>(t, name, attrs, props, is_scene);
+    return std::make_unique<NodeShow>(tok, name, attrs, props, is_scene);
 }
 
 void Graph::generate_nodes() {
@@ -305,7 +304,7 @@ void Graph::generate_nodes() {
                     ++lexer;
                 }
 
-                if (const auto set_tok = lexer.expect<TokIdent>(); set_tok->name == "set") {
+                if (const auto set_tok = lexer.expect<TokIdent>(); set_tok && set_tok->name == "set") {
                     if (auto ident = lexer.expect<TokIdent>();
                         ident && set_tok->indent == t.indent + 1) {
                         set = ident->name;
@@ -403,11 +402,13 @@ void Graph::generate_nodes() {
             [&](const TokDefault &t) {
                 ++lexer;
                 if (auto slice = expr_slice(lexer)) {
-                    if (auto new_expr = try_get_expr(lexer); is_valid_assign(new_expr->get())) {
-                        nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(*new_expr), false));
-                        nodes_w_expr.push_back(nodes.back().get());
-                    } else {
-                        errors.emplace_back(std::format("invalid Default declaration at {}", tok_pos(t)));
+                    if (auto new_expr = try_get_expr(lexer)) {
+                        if (is_valid_assign(new_expr->get())) {
+                            nodes.push_back(std::make_unique<NodeExpr>(t, *slice, std::move(*new_expr), false));
+                            nodes_w_expr.push_back(nodes.back().get());
+                        } else {
+                            errors.emplace_back(std::format("invalid Default declaration at {}", tok_pos(t)));
+                        }
                     }
                 } else {
                     errors.push_back(std::move(slice.error()));
@@ -556,11 +557,19 @@ void Graph::generate_nodes() {
         ++lexer;
     }
 
+    for (unsigned i = 0; i < nodes.size(); ++i) {
+        if (nodes.at(i)->indent == 0) {
+            roots.push_back(i);
+        }
+    }
+
     std::println("--------------------");
     if (errors.empty()) {
         std::println("parsing script OK!");
         connect_ancestors();
         connect_nexts();
+        // auto wc = find_highest_wc_path();
+        // std::println("max wc: {}", wc);
     } else {
         std::println(std::cerr, "Parsing script encountered {} error(s):", errors.size());
         for (const auto& error : errors) {
@@ -568,11 +577,178 @@ void Graph::generate_nodes() {
         }
     }
     std::println("--------------------");
-    std::println("====================");
-    for (const auto &n : nodes_w_atl) {
-        std::println("{:p}", *n);
+    if (nodes_w_atl.empty()) {
+        std::println("no nodes with ATL.");
+    } else {
+        for (const auto &n : nodes_w_atl) {
+            std::println("{:p}", *n);
+        }
     }
-    std::println("====================");
+    if (nodes_w_expr.empty()) {
+        std::println("no nodes with expr.");
+    } else {
+        for (const auto &n : nodes) {
+            if (dynamic_cast<NodeExpr*>(n.get())) {
+                // Typing::deduce_type(n.);
+            }
+        }
+    }
+    std::println("--------------------");
+    int total_wc = 0;
+    dfs<TrvOrd::Pre>([&](const Node &n) {
+        if (auto dialogue = dynamic_cast<const NodeDialogue*>(&n)) {
+            total_wc += dialogue->word_count;
+        }
+    });
+
+    // std::vector<std::set<const Node*>> groups;
+    // std::set<const Node*> visits;
+    // dfs<TrvOrd::Pre>([&](const Node &n) {
+    //     if (n.has_children() && !visits.contains(&n)) {
+    //         std::set<const Node*> new_group;
+    //         new_group.insert(&n);
+    //         visits.insert(&n);
+    //         std::optional<unsigned> next = n.next;
+    //         while (next) {
+    //             if (nodes.at(*next)->has_children() && !visits.contains(nodes.at(*next).get())) {
+    //                 new_group.insert(nodes.at(*next).get());
+    //                 visits.insert(nodes.at(*next).get());
+    //                 next = nodes.at(*next)->next;
+    //             } else {
+    //                 break;
+    //             }
+    //         }
+    //         groups.push_back(new_group);
+    //     }
+    // });
+    // for (const auto &g : groups) {
+    //     for (const auto &n : g) {
+    //         std::print("{:p}", *n);
+    //     }
+    //     std::println("");
+    // }
+    std::println("total word count: {}", total_wc);
+    std::println("--------------------");
+}
+
+auto Graph::find_highest_wc_path() const -> int {
+    struct Memo {
+        bool computed = false;
+        bool visiting = false;
+        int words = 0;
+        std::optional<unsigned> next;
+    };
+
+    std::vector<Memo> memos(nodes.size());
+
+    auto successors = [&](unsigned i) -> std::vector<unsigned> {
+        const auto &n = nodes.at(i);
+        if (const auto *menu = dynamic_cast<NodeMenu*>(n.get())) {
+            std::vector<unsigned> choices;
+
+            auto child = menu->first_child;
+            while (child && *child < *menu->after_block) {
+                if (dynamic_cast<NodeChoice*>(nodes.at(*child).get())) {
+                    choices.push_back(*child);
+                }
+
+                if (!nodes.at(*child)->next) {
+                    break;
+                }
+
+                child = nodes.at(*child)->next;
+            }
+
+            return choices;
+        }
+
+        if (dynamic_cast<NodeIf*>(n.get())) {
+            std::vector<unsigned> branches;
+            std::optional<unsigned> curr = i;
+
+            while (curr) {
+                const auto &branch = nodes.at(*curr);
+                if (dynamic_cast<NodeIf*>(branch.get())
+                    || dynamic_cast<NodeElif*>(branch.get())
+                    || dynamic_cast<NodeElse*>(branch.get())) {
+                    branches.push_back(*curr);
+                } else {
+                    break;
+                }
+
+                if (!branch->next) {
+                    break;
+                }
+
+                curr = branch->next;
+                if (dynamic_cast<NodeIf*>(nodes.at(*curr).get())) {
+                    break;
+                }
+            }
+
+            return branches;
+        }
+
+        if (const auto *parent = dynamic_cast<NodeParent*>(n.get())) {
+            if (parent->first_child) {
+                return {*parent->first_child};
+            }
+        }
+
+        if (n->next) {
+            return {*n->next};
+        }
+
+        return {};
+    };
+
+    std::function<int(unsigned)> best_from;
+    best_from = [&](unsigned i) -> int {
+        auto &m = memos.at(i);
+
+        if (m.computed) {
+            return m.words;
+        }
+
+        if (m.visiting) {
+            return 0;
+        }
+        m.visiting = true;
+
+        int best_tail = 0;
+        std::optional<unsigned> best_next;
+
+        for (const auto &s : successors(i)) {
+            if (const auto candidate = best_from(s); candidate > best_tail) {
+                best_tail = candidate;
+                best_next = s;
+            }
+        }
+
+        m.words = best_tail;
+        if (const auto *d = dynamic_cast<NodeDialogue*>(nodes.at(i).get())) {
+            m.words += d->word_count;
+        }
+        m.next = best_next;
+        m.visiting = false;
+        m.computed = true;
+
+        return m.words;
+    };
+
+    int best_total = 0;
+
+    for (const auto &r : roots) {
+        const auto candidate = best_from(r);
+        best_total += candidate;
+        std::optional<unsigned> curr = r;
+        while (curr) {
+            nodes.at(*curr)->path_flags |= Node::BEST_WC;
+            curr = memos.at(*curr).next;
+        }
+    }
+
+    return best_total;
 }
 
 Graph::Graph(const std::filesystem::path& path)
@@ -588,78 +764,8 @@ auto Graph::get_roots() -> std::vector<unsigned>& {
     return roots;
 }
 
-void Graph::print_as_graph() {
-    visited = std::vector<bool>(nodes.size());
-    const std::function<void(unsigned)> dfs_pre = [&](const unsigned node_idx) -> void {
-        if (node_idx >= nodes.size()) {
-            return;
-        }
-        if (nodes.at(node_idx) == nullptr) {
-            return;
-        }
-        if (visited.at(node_idx)) {
-            return;
-        }
-
-        visited.at(node_idx) = true;
-
-        const Node &node = *nodes.at(node_idx);
-        std::println("{:t}", node);
-
-        // for (const auto &idx : node.next) {
-        //     dfs_pre(idx);
-        // }
-    };
-
-    for (const auto &idx: roots) {
-        dfs_pre(idx);
-    }
-}
-
 void Graph::print_all_nodes() const {
     for (const auto &n : nodes) {
         std::println("{}", *n);
-
-        // if (const auto *chain = dynamic_cast<NodeIfChain *>(n.get())) {
-            // for (const auto &o : chain->children) {
-            //     std::println("\t{}", *nodes.at(o));
-            // }
-        // }
     }
-}
-
-auto Graph::graph_strs() -> std::vector<std::string> {
-    visited = std::vector<bool>(nodes.size());
-    std::function<void(unsigned node)> dfs_pre;
-    std::vector<std::string> strs;
-    dfs_pre = [&](const unsigned node_idx) -> void {
-        if (node_idx >= nodes.size()) {
-            return;
-        }
-        if (nodes.at(node_idx) == nullptr) {
-            return;
-        }
-        if (visited.at(node_idx)) {
-            return;
-        }
-
-        visited.at(node_idx) = true;
-
-        const Node &node = *nodes.at(node_idx);
-        strs.push_back(std::format("{:t}", node));
-
-        if (!node.has_children() && node.next) {
-            dfs_pre(*node.next);
-        } else if (node.has_children()) {
-            auto* parent = dynamic_cast<const NodeParent*>(&node);
-            // for (const auto &idx : parent->children) {
-            //     dfs_pre(idx);
-            // }
-        }
-    };
-    for (const auto &idx: roots) {
-        dfs_pre(idx);
-    }
-
-    return strs;
 }

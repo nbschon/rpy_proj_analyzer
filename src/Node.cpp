@@ -8,6 +8,8 @@
 #include <format>
 #include <utility>
 
+#include "Typing.hpp"
+
 auto operator<<(std::ostream& o, const Node& node) -> std::ostream& {
     o << std::string(node.indent, '\t') << node.to_string();
     return o;
@@ -246,12 +248,24 @@ auto NodeLabel::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     return {this, rect, "Label", {name}};
 }
 
+auto NodeDialogue::count_words() const -> int {
+    int count = 0;
+    char prev = text[0];
+    for (const auto &c : text) {
+        if (std::isspace(c) && !std::isspace(prev)) {
+            count++;
+        }
+        prev = c;
+    }
+    return count;
+}
+
 NodeDialogue::NodeDialogue(const Tok& token, std::string name, std::string text)
-    : Node(token), name(std::move(name)), text(std::move(text)) {
+    : Node(token), name(std::move(name)), text(std::move(text)), word_count(count_words()) {
 }
 
 NodeDialogue::NodeDialogue(const Tok& token, std::string text)
-    : Node(token), name(std::nullopt), text(std::move(text)) {
+    : Node(token), name(std::nullopt), text(std::move(text)), word_count(count_words()) {
 }
 
 auto NodeDialogue::to_string() const -> std::string {
@@ -279,8 +293,12 @@ NodeExpr::NodeExpr(const Tok& token, const std::span<const Token> expr_toks)
       display_str(std::ranges::fold_left(expr_toks, std::string{}, [](std::string out, const Token& t) {
           out += std::format("{:cr} ", t);
           return out;
-      })) {
-    expr = *fold_into_expr(expr_toks);
+      })),
+      expr(fold_into_expr(expr_toks).value_or(nullptr)) {
+    // expr = *fold_into_expr(expr_toks);
+    if (const auto t = Typing::deduce_type(expr)) {
+        std::println("{}", *t);
+    }
     if (is_valid_assign(expr.get())) {
         type = DeclareType::Python;
     } else {
@@ -322,8 +340,7 @@ auto NodeExpr::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     if (type == DeclareType::Default) {
         title = "Default Init";
     } else if (type == DeclareType::Define) {
-        title = "Define Init";
-        fields.emplace_back("({i}read only{/i})");
+        title = "Define Init ({i}const{/i})";
     } else {
         title = "Expression";
     }
@@ -338,10 +355,11 @@ NodePlay::NodePlay(const Tok& token, const AudioChannel channel, std::string pat
 auto NodePlay::to_string() const -> std::string {
     std::string ch_str;
     switch (channel) {
-        case AudioChannel::Music:
+        using enum AudioChannel;
+        case Music:
             ch_str = "Music";
             break;
-        case AudioChannel::Sfx:
+        case Sfx:
             ch_str = "SFX";
             break;
     }
@@ -353,10 +371,11 @@ auto NodePlay::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     std::vector<std::string> fields;
     fields.reserve(2);
     switch (channel) {
-        case AudioChannel::Music:
+        using enum AudioChannel;
+        case Music:
             fields.emplace_back("Channel: Music");
             break;
-        case AudioChannel::Sfx:
+        case Sfx:
             fields.emplace_back("Channel: SFX");
             break;
     }

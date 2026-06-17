@@ -6,7 +6,7 @@
 
 #include "Lexer.hpp"
 
-#include <cassert>
+#include <algorithm>
 #include <format>
 #include <optional>
 #include <string>
@@ -27,15 +27,16 @@ ExprBinary::ExprBinary(std::unique_ptr<Expr> lhs, const OpType& op, std::unique_
     : lhs(std::move(lhs)), rhs(std::move(rhs)), op(op) {
 }
 
-ExprCall::ExprCall(std::unique_ptr<Expr> callee, 
-            std::vector<std::unique_ptr<Expr>> args,
-            std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs) 
+ExprCall::ExprCall(std::unique_ptr<Expr> callee, std::vector<std::unique_ptr<Expr>> args, std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs)
     : callee(std::move(callee)), args(std::move(args)), kwargs(std::move(kwargs)) {
 }
 
-ExprCall::ExprCall(std::vector<std::unique_ptr<Expr>> args,
-            std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs)
+ExprCall::ExprCall(std::vector<std::unique_ptr<Expr>> args, std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs)
     : callee(nullptr), args(std::move(args)), kwargs(std::move(kwargs)) {
+}
+
+ExprTuple::ExprTuple(std::vector<std::unique_ptr<Expr>> elems)
+    : elems(std::move(elems)) {
 }
 
 auto ExprLit::to_string() const -> std::string {
@@ -103,6 +104,15 @@ auto ExprCall::to_string() const -> std::string {
     return std::format("[Callee: {}, {}, {}]", callee_str, arg_str, kwarg_str);
 }
 
+auto ExprTuple::to_string() const -> std::string {
+    auto elems_str = std::ranges::fold_left(elems, "", [](std::string out, const std::unique_ptr<Expr>& e) {
+        out += std::format("{}, ", e->to_string());
+        return out;
+    });
+
+    return std::format("[Tuple: {}]", elems_str);
+}
+
 auto expr_slice(Lexer &lexer) -> std::expected<std::span<const Token>, std::string> {
     const auto start_idx = lexer.get_idx();
 
@@ -162,7 +172,7 @@ auto expr_slice(Lexer &lexer) -> std::expected<std::span<const Token>, std::stri
 }
 
 auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx)
--> std::expected<std::unique_ptr<ExprCall>, std::string> {
+    -> std::vector<std::span<const Token>> {
     auto idx = start_idx;
     int n_l = 0;
     while (idx < toks.size()) {
@@ -186,7 +196,7 @@ auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx)
 
     n_l = 0;
     int left_idx = 0;
-    std::vector<std::span<const Token>> arg_spans;
+    std::vector<std::span<const Token>> arg_toks;
     for (int i = 0; i < inside_parens.size(); ++i) {
         const auto &curr = inside_parens[i];
         if (std::holds_alternative<TokLParen>(curr)) {
@@ -196,19 +206,26 @@ auto split_inside_parens(std::span<const Token> toks, unsigned& start_idx)
         }
 
         if (std::holds_alternative<TokComma>(curr) && n_l == 0) {
-            arg_spans.emplace_back(inside_parens.subspan(left_idx, i - left_idx));
+            arg_toks.emplace_back(inside_parens.subspan(left_idx, i - left_idx));
             left_idx = i + 1;
         }
     }
 
     if (left_idx != inside_parens.size() - 1) {
-        arg_spans.emplace_back(inside_parens.subspan(left_idx, inside_parens.size() - 1 - left_idx));
+        arg_toks.emplace_back(inside_parens.subspan(left_idx, inside_parens.size() - 1 - left_idx));
     }
+
+    return arg_toks;
+}
+
+auto make_expr_call(std::span<const Token> toks, unsigned& start_idx)
+-> std::expected<std::unique_ptr<ExprCall>, std::string> {
+    auto arg_toks = split_inside_parens(toks, start_idx);
 
     std::vector<std::unique_ptr<Expr>> fn_args;
     std::vector<std::pair<std::string, std::unique_ptr<Expr>>> fn_kwargs;
 
-    for (const auto &a : arg_spans) {
+    for (const auto &a : arg_toks) {
         if (a.size() > 2) {
             if (std::holds_alternative<TokIdent>(a[0]) && std::holds_alternative<TokOp>(a[1])) {
                 if (std::get<TokOp>(a[1]).type == OpType::Assign) {
@@ -258,7 +275,6 @@ auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_p
 
     using Result = std::expected<std::unique_ptr<Expr>, std::string>;
 
-    // TODO: graceful error reporting instead of crashing
     const auto lhs_tok = consume();
     auto lhs = std::visit(Overload {
         [&](const TokIdent& t) -> Result {
@@ -277,17 +293,24 @@ auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_p
             return std::make_unique<ExprLit>(t.value);
         },
         [&](const TokLParen&) -> Result {
+            auto lparen_idx = idx - 1;
             auto expr = fold_into_expr(toks, idx, 0.0f);
 
             if (expr) {
                 if (std::holds_alternative<TokRParen>(*peek())) {
-                    return std::unexpected(std::format("expected RParen at {}", tok_pos(*peek())));
+                    return std::unexpected(std::format("extra RParen at {}", tok_pos(*peek())));
+                }
+                consume();
+                if (std::holds_alternative<TokComma>(*peek())) {
+                    auto elem_toks = split_inside_parens(toks, lparen_idx);
+                    idx = lparen_idx;
+                    std::println("");
                 }
                 consume();
                 return expr;
             }
 
-            return std::unexpected(expr.error());
+            return std::unexpected(std::move(expr.error()));
         },
         [&](const TokOp& t) -> Result {
             auto [l_prec, r_prec] = precedence(t.type);
@@ -305,7 +328,7 @@ auto fold_into_expr(std::span<const Token> toks, unsigned idx, const float min_p
         }
 
         if (std::holds_alternative<TokLParen>(*peek())) {
-            if (auto call = split_inside_parens(toks, idx)) {
+            if (auto call = make_expr_call(toks, idx)) {
                 (*call)->callee = std::move(*lhs);
                 lhs = std::move(call);
             } else {

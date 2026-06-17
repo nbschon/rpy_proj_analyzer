@@ -8,6 +8,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #set_property(TARGET rpy_proj_analyzer PROPERTY CXX_STANDARD_REQUIRED ON)
 #set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g -fno-inline")
 
 set(RAYLIB_VERSION 5.5)
 find_package(raylib ${RAYLIB_VERSION} QUIET) # QUIET or REQUIRED
@@ -54,6 +55,8 @@ add_executable(rpy_proj_analyzer
         src/Panel.hpp
         src/ATL.cpp
         src/ATL.hpp
+        src/Typing.cpp
+        src/Typing.hpp
 )
 
 target_include_directories(rpy_proj_analyzer PRIVATE ${CMAKE_SOURCE_DIR}/include)

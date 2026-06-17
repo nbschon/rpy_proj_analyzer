@@ -78,7 +78,10 @@ ViewScreen::ViewScreen(const std::filesystem::path &path, const raylib::Window &
     } else {
         raylib::SetWindowTitle(std::format("rpy_proj_analyzer: {}", path.filename().string()));
         scripts[path] = std::make_unique<RenpyFile>(path);
-        std::tie(display_nodes, line_points) = scripts[path]->layout.make_displayables(scripts[path]->graph);
+        auto [disps, line_pts, hlights] = scripts[path]->layout.make_displayables(scripts[path]->graph);
+        this->display_nodes = std::move(disps);
+        this->line_points = std::move(line_pts);
+        this->highlights = std::move(hlights);
 
         auto dn_min_x = std::numeric_limits<float>::max();
         auto dn_max_x = -std::numeric_limits<float>::max();
@@ -119,7 +122,11 @@ ViewScreen::ViewScreen(const std::filesystem::path &path, const raylib::Window &
 void ViewScreen::setup_viewport(const std::filesystem::path &path, const raylib::Window &win) {
     raylib::SetWindowTitle(std::format("rpy_proj_analyzer: {}", path.filename().string()));
     const auto &file = scripts.at(path);
-    std::tie(display_nodes, line_points) = file->layout.make_displayables(file->graph);
+    auto [disps, line_pts, hlights] = file->layout.make_displayables(file->graph);
+    this->display_nodes = std::move(disps);
+    this->line_points = std::move(line_pts);
+    this->highlights = std::move(hlights);
+    // std::tie(display_nodes, line_points) = file->layout.make_displayables(file->graph);
 
     auto dn_min_x = std::numeric_limits<float>::max();
     auto dn_max_x = -std::numeric_limits<float>::max();
@@ -275,6 +282,10 @@ void ViewScreen::draw(const raylib::Window &win) {
         for (const auto &points : line_points) {
             // DrawSplineBasis(points.data(), 5, 2.0, raylib::Color::Red());
             // DrawLineEx(points.at(1), points.at(3), 2.0, raylib::Color::Red());
+        }
+
+        for (const auto &h : highlights) {
+            h.Draw(raylib::Color::Green());
         }
 
         for (const auto& dn : on_screen) {

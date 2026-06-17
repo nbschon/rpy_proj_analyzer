@@ -46,12 +46,17 @@ protected:
     unsigned col = 0;
 
 public:
+    static constexpr std::uint8_t BEST_WC = 0b1;
+    static constexpr std::uint8_t WORST_WC = 0b10;
+    static constexpr std::uint8_t BEST_INC = 0b100;
+    static constexpr std::uint8_t BEST_DEC = 0b1000;
+
     std::optional<unsigned> parent;
     std::optional<unsigned> next;
     std::optional<unsigned> prev;
     unsigned indent = 0;
     unsigned width = 0;
-    int score_potential = 0;
+    std::uint8_t path_flags = 0x00;
 
     explicit Node(const Tok &tok);
     Node(unsigned line, unsigned col, unsigned indent);
@@ -178,7 +183,11 @@ class NodeDialogue final : public Node {
     std::optional<std::string> name;
     std::string text;
 
+    auto count_words() const -> int;
+
 public:
+    int word_count = 0;
+
     NodeDialogue(const Tok& token, std::string name, std::string text);
 
     NodeDialogue(const Tok& token, std::string text);

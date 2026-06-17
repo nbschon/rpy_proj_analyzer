@@ -98,7 +98,6 @@ auto Layout::make_label(const std::vector<std::unique_ptr<Node>>& nodes,
     const auto label_idx = idx;
 
     const auto *label = dynamic_cast<NodeLabel*>(nodes.at(label_idx).get());
-    std::println("{:p}", *nodes.at(label_idx));
 
     std::vector<LayoutColumn> column;
     LayoutColumn col(nodes, header_idx, idx, label);
@@ -117,7 +116,7 @@ void Layout::layout_node(LayoutBase& disp, const int left_x, const unsigned row)
 
 void Layout::layout_column(const LayoutColumn& col, const int left_x, const unsigned row) {
     unsigned curr_row = row;
-    for (auto& display : col.displays) {
+    for (const auto& display : col.displays) {
         const int parent_center = left_x + static_cast<int>(col.center_offset);
 
         if (const auto* g = dynamic_cast<LayoutGroup*>(display.get())) {
@@ -158,6 +157,17 @@ auto LayoutBase::update_height() -> unsigned {
     return 1;
 }
 
+auto LayoutBase::update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int {
+    if (const auto *dialogue = dynamic_cast<NodeDialogue*>(nodes.at(idx).get())) {
+        return dialogue->word_count;
+    }
+    return 0;
+}
+
+void LayoutBase::mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) {
+    nodes.at(idx)->path_flags |= Node::BEST_WC;
+}
+
 void LayoutBase::flatten(std::vector<LayoutBase*>& flat_disps) {
     flat_disps.push_back(this);
 }
@@ -176,7 +186,7 @@ auto LayoutItem::to_string() -> std::string {
     return std::format("LayoutItem w node idx {}", idx);
 }
 
-auto LayoutItem::get_pre_item() -> std::optional<unsigned> {
+auto LayoutItem::get_pre_item() const -> std::optional<unsigned> {
     return pre_idx;
 }
 
@@ -194,9 +204,9 @@ LayoutColumn::LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, cons
             std::unique_ptr<LayoutGroup> group_ptr = nullptr;
 
             if (n->has_children()) {
-                if (dynamic_cast<NodeIf*>(n.get())) {
+                if (dynamic_cast<NodeIf*>(n.get()) != nullptr) {
                     this->displays.emplace_back(Layout::make_ifs(nodes, *prev_idx, child_idx));
-                } else if (dynamic_cast<NodeMenu*>(n.get())) {
+                } else if (dynamic_cast<NodeMenu*>(n.get()) != nullptr) {
                     // ==============================================================
                     // kind of a hack, but necessary due to the way menus are grouped
                     this->displays.emplace_back(std::make_unique<LayoutItem>(child_idx));
@@ -204,7 +214,7 @@ LayoutColumn::LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, cons
 
                     // then just do it like normal
                     this->displays.emplace_back(Layout::make_menu(nodes, *prev_idx, child_idx));
-                } else if (dynamic_cast<NodeLabel*>(n.get())) {
+                } else if (dynamic_cast<NodeLabel*>(n.get()) != nullptr) {
                     this->displays.emplace_back(Layout::make_label(nodes, *prev_idx, child_idx));
                 }
             } else {
@@ -262,6 +272,20 @@ auto LayoutColumn::update_height() -> unsigned {
     }
     this->height = std::max(1u, acc_height);
     return this->height;
+}
+
+auto LayoutColumn::update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int {
+    int acc_wc = 0;
+    for (const auto& node : displays) {
+        acc_wc += node->update_highest_wc(nodes);
+    }
+    return acc_wc;
+}
+
+void LayoutColumn::mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) {
+    for (const auto &disp : displays) {
+        disp->mark_highest_wc(nodes);
+    }
 }
 
 void LayoutColumn::flatten(std::vector<LayoutBase*>& flat_disps) {
@@ -323,6 +347,30 @@ auto LayoutGroup::update_height() -> unsigned {
     return height;
 }
 
+auto LayoutGroup::update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int {
+    int max_wc = 0;
+    for (auto &column : columns) {
+        auto curr_wc = column.update_highest_wc(nodes);
+        max_wc = std::max(curr_wc, max_wc);
+    }
+
+    return max_wc;
+}
+
+void LayoutGroup::mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) {
+    int max_wc = 0;
+    int max_idx = 0;
+    for (int i = 0; i < columns.size(); ++i) {
+        auto curr_wc = columns.at(i).update_highest_wc(nodes);
+        if (curr_wc > max_wc) {
+            max_wc = curr_wc;
+            max_idx = i;
+        }
+    }
+
+    columns.at(max_idx).mark_highest_wc(nodes);
+}
+
 void LayoutGroup::flatten(std::vector<LayoutBase*>& flat_disps) {
     for (auto& col : columns) {
         col.flatten(flat_disps);
@@ -373,6 +421,15 @@ void GraphLayout::assign_layouts() {
     }
 }
 
+void GraphLayout::assign_wc(const std::vector<std::unique_ptr<Node>>& nodes) const {
+    int acc_wc = 0;
+    for (const auto &group : top_levels) {
+        acc_wc += group->update_highest_wc(nodes);
+        group->mark_highest_wc(nodes);
+    }
+    std::println("max word count: {}", acc_wc);
+}
+
 void GraphLayout::flatten() {
     for (const auto& group : top_levels) {
         group->flatten(flat_disps);
@@ -402,6 +459,7 @@ GraphLayout::GraphLayout(Graph& graph) {
 
     assign_dimensions();
     assign_layouts();
+    assign_wc(graph.get_nodes());
     flatten();
 
     std::println("{} display nodes, {} graph nodes.", flat_disps.size(), graph.get_nodes().size());
@@ -419,7 +477,7 @@ auto GraphLayout::get_max_width() -> unsigned {
     );
 }
 
-auto GraphLayout::make_displayables(Graph& graph) -> std::pair<std::vector<DisplayNode>, std::vector<std::array<raylib::Vector2, 5>>> {
+auto GraphLayout::make_displayables(Graph& graph) -> LayoutData {
     std::vector<unsigned> idxs;
     auto displayables =
             flat_disps
@@ -473,5 +531,23 @@ auto GraphLayout::make_displayables(Graph& graph) -> std::pair<std::vector<Displ
         line_points.push_back({child_pt, child_up, middle, parent_down, parent_pt});
     }
 
-    return {std::move(displayables), std::move(line_points)};
+    std::vector<raylib::Rectangle> rects;
+    for (const auto &d : displayables) {
+        if ((d.get_underlying()->path_flags & Node::BEST_WC) > 0) {
+            auto new_rect = d.main_box;
+            new_rect.x -= 2.0f;
+            new_rect.width += 4.0f;
+            new_rect.y -= 2.0f;
+            new_rect.height += 4.0f;
+            rects.push_back(new_rect);
+        }
+    }
+
+    if (rects.empty()) {
+        std::println("NO RECTS");
+    }
+
+    return {.disps=std::move(displayables),
+        .line_points=std::move(line_points),
+        .highlights=std::move(rects)};
 }

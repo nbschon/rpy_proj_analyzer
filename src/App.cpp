@@ -77,13 +77,14 @@ auto App::run() -> int {
     std::unique_ptr<Screen> screen;
     bool is_dir = state.path_type == State::PathType::Directory;
     switch (state.mode) {
-        case State::Mode::LoadPath:
+        using enum State::Mode;
+        case LoadPath:
             screen = std::make_unique<LoadScreen>();
             break;
-        case State::Mode::View:
+        case View:
             screen = std::make_unique<ViewScreen>(*ArgVParser::path, window, is_dir);
             break;
-        case State::Mode::Exit:
+        case Exit:
             run = false;
             break;
     }
@@ -107,13 +108,14 @@ auto App::run() -> int {
 
         if (prev_mode != state.mode) {
             switch (state.mode) {
-                case State::Mode::LoadPath:
+                using enum State::Mode;
+                case LoadPath:
                     screen = std::make_unique<LoadScreen>();
                     break;
-                case State::Mode::View:
+                case View:
                     screen = std::make_unique<ViewScreen>(*state.path, window, is_dir);
                     break;
-                case State::Mode::Exit:
+                case Exit:
                     run = false;
                     break;
             }

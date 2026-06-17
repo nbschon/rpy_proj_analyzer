@@ -47,8 +47,9 @@ enum class BinaryOp : std::uint8_t {
 
 inline auto args(const OpType &op) -> unsigned {
     switch (op) {
-        case OpType::Not:
-        case OpType::Neg:
+        using enum OpType;
+        case Not:
+        case Neg:
             return 1;
         default:
             return 2;
@@ -57,40 +58,41 @@ inline auto args(const OpType &op) -> unsigned {
 
 inline auto precedence(const OpType &op) -> std::pair<float, float> {
     switch (op) {
-        case OpType::Assign:
-        case OpType::PlusEq:
-        case OpType::MinusEq:
-        case OpType::MultEq:
-        case OpType::DivEq:
+        using enum OpType;
+        case Assign:
+        case PlusEq:
+        case MinusEq:
+        case MultEq:
+        case DivEq:
             // right assoc
             return {1.0f, 1.1f};
-        case OpType::Or:
+        case Or:
             // left assoc
             return {2.1f, 2.0f};
-        case OpType::And:
+        case And:
             // left assoc
             return {3.1f, 3.0f};
-        case OpType::Not:
+        case Not:
             // left assoc (but only one arg)
             return {4.0f, 4.1f};
-        case OpType::Eq:
-        case OpType::NotEq:
-        case OpType::Less:
-        case OpType::LessEq:
-        case OpType::Greater:
-        case OpType::GreaterEq:
-        case OpType::In:
+        case Eq:
+        case NotEq:
+        case Less:
+        case LessEq:
+        case Greater:
+        case GreaterEq:
+        case In:
             // left assoc
             return {5.1f, 5.0f};
-        case OpType::Plus:
-        case OpType::Minus:
+        case Plus:
+        case Minus:
             // left assoc
             return {6.1f, 6.0f};
-        case OpType::Mult:
-        case OpType::Div:
+        case Mult:
+        case Div:
             // left assoc
             return {7.1f, 7.0f};
-        case OpType::Neg:
+        case Neg:
             // right assoc (but only one arg)
             return {8.0f, 8.1f};
         default:
@@ -101,9 +103,10 @@ inline auto precedence(const OpType &op) -> std::pair<float, float> {
 
 inline auto unary_str(const UnaryOp &op) -> std::string {
     switch (op) {
-        case UnaryOp::Not:
+        using enum UnaryOp;
+        case Not:
             return "!";
-        case UnaryOp::Neg:
+        case Neg:
             return "-";
         default:
             std::println(std::cerr, "unknown unary operator in Expr");
@@ -113,41 +116,42 @@ inline auto unary_str(const UnaryOp &op) -> std::string {
 
 inline auto binary_str(const BinaryOp &op) -> std::string {
     switch (op) {
-        case BinaryOp::Plus:
+        using enum BinaryOp;
+        case Plus:
             return "+";
-        case BinaryOp::Minus:
+        case Minus:
             return "-";
-        case BinaryOp::Mult:
+        case Mult:
             return "*";
-        case BinaryOp::Div:
+        case Div:
             return "/";
-        case BinaryOp::Assign:
+        case Assign:
             return "=";
-        case BinaryOp::PlusEq:
+        case PlusEq:
             return "+=";
-        case BinaryOp::MinusEq:
+        case MinusEq:
             return "-=";
-        case BinaryOp::MultEq:
+        case MultEq:
             return "*=";
-        case BinaryOp::DivEq:
+        case DivEq:
             return "/=";
-        case BinaryOp::Eq:
+        case Eq:
             return "==";
-        case BinaryOp::NotEq:
+        case NotEq:
             return "!=";
-        case BinaryOp::Less:
+        case Less:
             return "<";
-        case BinaryOp::LessEq:
+        case LessEq:
             return "<=";
-        case BinaryOp::Greater:
+        case Greater:
             return ">";
-        case BinaryOp::GreaterEq:
+        case GreaterEq:
             return ">=";
-        case BinaryOp::In:
+        case In:
             return "in";
-        case BinaryOp::And:
+        case And:
             return "and";
-        case BinaryOp::Or:
+        case Or:
             return "or";
         default:
             std::println(std::cerr, "unknown binary operator in Expr");
@@ -193,11 +197,9 @@ struct ExprBinary : Expr {
 };
 
 struct ExprCall : Expr {
-    explicit ExprCall(std::unique_ptr<Expr> callee, 
-            std::vector<std::unique_ptr<Expr>> args,
-            std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs);
-    ExprCall(std::vector<std::unique_ptr<Expr>> args,
-            std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs);
+    explicit ExprCall(std::unique_ptr<Expr> callee,
+        std::vector<std::unique_ptr<Expr>> args, std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs);
+    explicit ExprCall(std::vector<std::unique_ptr<Expr>> args, std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs);
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
     std::vector<std::pair<std::string, std::unique_ptr<Expr>>> kwargs;
@@ -205,9 +207,19 @@ struct ExprCall : Expr {
     [[nodiscard]] auto to_string() const -> std::string override;
 };
 
+struct ExprTuple : Expr {
+    explicit ExprTuple(std::vector<std::unique_ptr<Expr>> elems);
+    std::vector<std::unique_ptr<Expr>> elems;
+
+    [[nodiscard]] auto to_string() const -> std::string override;
+};
+
 [[nodiscard]] auto expr_slice(Lexer &lexer) -> std::expected<std::span<const Token>, std::string>;
 
 [[nodiscard]] auto split_inside_parens(std::span<const Token> toks, unsigned &start_idx)
+    -> std::vector<std::span<const Token>>;
+
+[[nodiscard]] auto make_expr_call(std::span<const Token> toks, unsigned &start_idx)
 -> std::expected<std::unique_ptr<ExprCall>, std::string>;
 
 [[nodiscard]] auto fold_into_expr(std::span<const Token> toks, unsigned idx = 0, float min_prec = 0.0)

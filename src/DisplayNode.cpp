@@ -131,3 +131,7 @@ auto DisplayNode::get_width() -> float {
 auto DisplayNode::get_height() -> float {
     return height + (margin.t + margin.b) + (padding.t + padding.b);
 }
+
+auto DisplayNode::get_underlying() const -> const Node* {
+    return underlying;
+}

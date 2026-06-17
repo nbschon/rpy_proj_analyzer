@@ -55,10 +55,10 @@ auto TextHelper::color_from_hex(const std::string_view hex_str, const std::uint8
             }
             case 6: {
                 col_val = col_val << 8 | 0xFF;
-                return col_val;
+                return raylib::Color(col_val);
             }
             case 8: {
-                return col_val;
+                return raylib::Color(col_val);
             }
             default:
                 std::unreachable();

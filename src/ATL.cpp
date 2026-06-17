@@ -664,97 +664,98 @@ auto ATL::get_str(const ATLStmt& stmt) -> std::string {
 
 auto ATL::trans_str(const Transition& trans) -> std::string {
     switch (trans) {
-        case Transition::Dissolve:
+        using enum Transition;
+        case Dissolve:
             return "dissolve";
-        case Transition::Fade:
+        case Fade:
             return "fade";
-        case Transition::Pixellate:
+        case Pixellate:
             return "pixellate";
-        case Transition::Move:
+        case Move:
             return "move";
-        case Transition::MoveInRight:
+        case MoveInRight:
             return "moveinright";
-        case Transition::MoveInLeft:
+        case MoveInLeft:
             return "moveinleft";
-        case Transition::MoveInTop:
+        case MoveInTop:
             return "moveintop";
-        case Transition::MoveInBottom:
+        case MoveInBottom:
             return "moveinbottom";
-        case Transition::MoveOutRight:
+        case MoveOutRight:
             return "moveoutright";
-        case Transition::MoveOutLeft:
+        case MoveOutLeft:
             return "moveoutleft";
-        case Transition::MoveOutTop:
+        case MoveOutTop:
             return "moveouttop";
-        case Transition::MoveOutBottom:
+        case MoveOutBottom:
             return "moveoutbottom";
-        case Transition::Ease:
+        case Ease:
             return "ease";
-        case Transition::EaseInRight:
+        case EaseInRight:
             return "easeinright";
-        case Transition::EaseInLeft:
+        case EaseInLeft:
             return "easeinleft";
-        case Transition::EaseInTop:
+        case EaseInTop:
             return "easeintop";
-        case Transition::EaseInBottom:
+        case EaseInBottom:
             return "easeinbottom";
-        case Transition::EaseOutRight:
+        case EaseOutRight:
             return "easeoutright";
-        case Transition::EaseOutLeft:
+        case EaseOutLeft:
             return "easeoutleft";
-        case Transition::EaseOutTop:
+        case EaseOutTop:
             return "easeouttop";
-        case Transition::EaseOutBottom:
+        case EaseOutBottom:
             return "easeoutbottom";
-        case Transition::ZoomIn:
+        case ZoomIn:
             return "zoomin";
-        case Transition::ZoomOut:
+        case ZoomOut:
             return "zoomout";
-        case Transition::ZoomInOut:
+        case ZoomInOut:
             return "zoominout";
-        case Transition::VPunch:
+        case VPunch:
             return "vpunch";
-        case Transition::HPunch:
+        case HPunch:
             return "hpunch";
-        case Transition::Blinds:
+        case Blinds:
             return "blinds";
-        case Transition::Squares:
+        case Squares:
             return "squares";
-        case Transition::WipeLeft:
+        case WipeLeft:
             return "wipeleft";
-        case Transition::WipeRight:
+        case WipeRight:
             return "wiperight";
-        case Transition::WipeUp:
+        case WipeUp:
             return "wipeup";
-        case Transition::WipeDown:
+        case WipeDown:
             return "wipedown";
-        case Transition::SlideLeft:
+        case SlideLeft:
             return "slideleft";
-        case Transition::SlideRight:
+        case SlideRight:
             return "slideright";
-        case Transition::SlideUp:
+        case SlideUp:
             return "slideup";
-        case Transition::SlideDown:
+        case SlideDown:
             return "slidedown";
-        case Transition::SlideAwayLeft:
+        case SlideAwayLeft:
             return "slideawayleft";
-        case Transition::SlideAwayRight:
+        case SlideAwayRight:
             return "slideawayright";
-        case Transition::SlideAwayUp:
+        case SlideAwayUp:
             return "slideawayup";
-        case Transition::SlideAwayDown:
+        case SlideAwayDown:
             return "slideawaydown";
-        case Transition::PushRight:
+        case PushRight:
             return "pushright";
-        case Transition::PushLeft:
+        case PushLeft:
             return "pushleft";
-        case Transition::PushUp:
+        case PushUp:
             return "pushup";
-        case Transition::PushDown:
+        case PushDown:
             return "pushdown";
-        case Transition::IrisIn:
+        case IrisIn:
             return "irisin";
-        case Transition::IrisOut:
+        case IrisOut:
             return "irisout";
     }
     std::println(std::cerr, "invalid transition type");
@@ -763,15 +764,16 @@ auto ATL::trans_str(const Transition& trans) -> std::string {
 
 auto ATL::warper_str(const Warper& warper) -> std::string {
     switch (warper) {
-        case Warper::Pause:
+        using enum Warper;
+        case Pause:
             return "pause";
-        case Warper::Linear:
+        case Linear:
             return "linear";
-        case Warper::Ease:
+        case Ease:
             return "ease";
-        case Warper::EaseIn:
+        case EaseIn:
             return "easein";
-        case Warper::EaseOut:
+        case EaseOut:
             return "easeout";
     }
     std::println(std::cerr, "invalid warper type");
@@ -780,101 +782,102 @@ auto ATL::warper_str(const Warper& warper) -> std::string {
 
 auto ATL::prop_str(const TFProp& type) -> std::string {
     switch (type) {
-        case TFProp::Pos:
+        using enum TFProp;
+        case Pos:
             return "pos";
-        case TFProp::XPos:
+        case XPos:
             return "xpos";
-        case TFProp::YPos:
+        case YPos:
             return "ypos";
-        case TFProp::Anchor:
+        case Anchor:
             return "anchor";
-        case TFProp::XAnchor:
+        case XAnchor:
             return "xanchor";
-        case TFProp::YAnchor:
+        case YAnchor:
             return "yanchor";
-        case TFProp::Align:
+        case Align:
             return "align";
-        case TFProp::XAlign:
+        case XAlign:
             return "xalign";
-        case TFProp::YAlign:
+        case YAlign:
             return "yalign";
-        case TFProp::Offset:
+        case Offset:
             return "offset";
-        case TFProp::XOffset:
+        case XOffset:
             return "xoffset";
-        case TFProp::YOffset:
+        case YOffset:
             return "yoffset";
-        case TFProp::XYCenter:
+        case XYCenter:
             return "xycenter";
-        case TFProp::XCenter:
+        case XCenter:
             return "xcenter";
-        case TFProp::YCenter:
+        case YCenter:
             return "ycenter";
-        case TFProp::SubPixel:
+        case SubPixel:
             return "subpixel";
-        case TFProp::Rotate:
+        case Rotate:
             return "rotate";
-        case TFProp::Rotate_Pad:
+        case Rotate_Pad:
             return "rotate_pad";
-        case TFProp::TF_Anchor:
+        case TF_Anchor:
             return "transform_anchor";
-        case TFProp::Zoom:
+        case Zoom:
             return "zoom";
-        case TFProp::XZoom:
+        case XZoom:
             return "xzoom";
-        case TFProp::YZoom:
+        case YZoom:
             return "yzoom";
-        case TFProp::Nearest:
+        case Nearest:
             return "nearest";
-        case TFProp::Alpha:
+        case Alpha:
             return "alpha";
-        case TFProp::Additive:
+        case Additive:
             return "additive";
-        case TFProp::MatrixColor:
+        case MatrixColor:
             return "matrixcolor";
-        case TFProp::Blur:
+        case Blur:
             return "blur";
-        case TFProp::Around:
+        case Around:
             return "around";
-        case TFProp::Angle:
+        case Angle:
             return "angle";
-        case TFProp::Radius:
+        case Radius:
             return "radius";
-        case TFProp::AnchorAround:
+        case AnchorAround:
             return "anchoraround";
-        case TFProp::AnchorAngle:
+        case AnchorAngle:
             return "anchorangle";
-        case TFProp::AnchorRadius:
+        case AnchorRadius:
             return "anchorradius";
-        case TFProp::Crop:
+        case Crop:
             return "crop";
-        case TFProp::Corner1:
+        case Corner1:
             return "corner1";
-        case TFProp::Corner2:
+        case Corner2:
             return "corner2";
-        case TFProp::XYSize:
+        case XYSize:
             return "xysize";
-        case TFProp::XSize:
+        case XSize:
             return "xsize";
-        case TFProp::YSize:
+        case YSize:
             return "ysize";
-        case TFProp::Fit:
+        case Fit:
             return "fit";
-        case TFProp::XPan:
+        case XPan:
             return "xpan";
-        case TFProp::YPan:
+        case YPan:
             return "ypan";
-        case TFProp::XTile:
+        case XTile:
             return "xtile";
-        case TFProp::YTile:
+        case YTile:
             return "ytile";
-        case TFProp::Delay:
+        case Delay:
             return "delay";
-        case TFProp::Events:
+        case Events:
             return "events";
-        case TFProp::FPS:
+        case FPS:
             return "fps";
-        case TFProp::Show_Cancels_Hide:
+        case Show_Cancels_Hide:
             return "show_cancels_hide";
     }
     std::println(std::cerr, "invalid transformation property");
@@ -883,27 +886,28 @@ auto ATL::prop_str(const TFProp& type) -> std::string {
 
 auto ATL::event_str(const Event &event) -> std::string {
     switch (event) {
-        case Event::Start:
+        using enum Event;
+        case Start:
             return "start";
-        case Event::Show:
+        case Show:
             return "show";
-        case Event::Replace:
+        case Replace:
             return "replace";
-        case Event::Hide:
+        case Hide:
             return "hide";
-        case Event::Replaced:
+        case Replaced:
             return "replaced";
-        case Event::Hover:
+        case Hover:
             return "hover";
-        case Event::Idle:
+        case Idle:
             return "idle";
-        case Event::SelectedHover:
+        case SelectedHover:
             return "selected_hover";
-        case Event::SelectedIdle:
+        case SelectedIdle:
             return "selected_idle";
-        case Event::Insensitive:
+        case Insensitive:
             return "insensitive";
-        case Event::SelectedInsensitive:
+        case SelectedInsensitive:
             return "selected_insensitive";
     }
     std::println(std::cerr, "invalid event name");

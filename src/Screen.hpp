@@ -69,6 +69,7 @@ class ViewScreen final : public Screen {
 
     std::vector<DisplayNode> display_nodes;
     std::vector<std::array<raylib::Vector2, 5>> line_points;
+    std::vector<raylib::Rectangle> highlights;
 
     raylib::Camera2D camera;
     float min_x;

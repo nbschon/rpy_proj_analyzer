@@ -115,6 +115,8 @@ public:
     static auto get_width() -> float;
 
     static auto get_height() -> float;
+
+    [[nodiscard]] auto get_underlying() const -> const Node*;
 };
 
 template<>

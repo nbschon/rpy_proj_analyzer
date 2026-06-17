@@ -29,7 +29,6 @@ enum class GroupType : std::uint8_t {
     Label,
 };
 
-
 class LayoutBase {
 protected:
     unsigned idx;
@@ -45,6 +44,8 @@ public:
     virtual auto has_children() -> bool;
     virtual auto update_width() -> unsigned;
     virtual auto update_height() -> unsigned;
+    virtual auto update_highest_wc(const std::vector<std::unique_ptr<Node>> &nodes) -> int;
+    virtual void mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes);
     virtual void flatten(std::vector<LayoutBase*>& flat_disps);
     virtual void collect_edges(std::unordered_map<Node*, Node*>& edges);
     [[nodiscard]] auto get_idx() const -> unsigned;
@@ -56,7 +57,7 @@ class LayoutItem : public LayoutBase {
 public:
     explicit LayoutItem(unsigned idx);
     auto to_string() -> std::string override;
-    auto get_pre_item() -> std::optional<unsigned>;
+    [[nodiscard]] auto get_pre_item() const -> std::optional<unsigned>;
 };
 
 class LayoutColumn : public LayoutBase {
@@ -70,6 +71,8 @@ public:
     auto has_children() -> bool override;
     auto update_width() -> unsigned override;
     auto update_height() -> unsigned override;
+    auto update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int override;
+    void mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) override;
     void flatten(std::vector<LayoutBase*>& flat_disps) override;
     void collect_edges(std::unordered_map<Node*, Node*>& edges) override;
 };
@@ -88,6 +91,8 @@ public:
     auto has_children() -> bool override;
     auto update_width() -> unsigned override;
     auto update_height() -> unsigned override;
+    auto update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int override;
+    void mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) override;
     void flatten(std::vector<LayoutBase*>& flat_disps) override;
     void collect_edges(std::unordered_map<Node*, Node*>& edges) override;
     [[nodiscard]] auto anchor_x() const -> int;
@@ -98,6 +103,7 @@ constexpr int N_POINTS = 5;
 struct LayoutData {
     std::vector<DisplayNode> disps;
     std::vector<std::array<raylib::Vector2, N_POINTS>> line_points;
+    std::vector<raylib::Rectangle> highlights;
 };
 
 class GraphLayout {
@@ -105,6 +111,7 @@ class GraphLayout {
     std::vector<LayoutBase*> flat_disps;
     void assign_dimensions() const;
     void assign_layouts();
+    void assign_wc(const std::vector<std::unique_ptr<Node>>&) const;
     void flatten();
     [[nodiscard]] auto collect_edges() const -> std::unordered_map<Node*, Node*>;
 
@@ -112,7 +119,7 @@ public:
     explicit GraphLayout(Graph &graph);
     auto get_groups() -> std::vector<std::unique_ptr<LayoutBase>>&;
     auto get_max_width() -> unsigned;
-    auto make_displayables(Graph &graph) -> std::pair<std::vector<DisplayNode>, std::vector<std::array<raylib::Vector2, N_POINTS>>>;
+    auto make_displayables(Graph &graph) -> LayoutData;
 };
 
 namespace Layout {

@@ -391,51 +391,52 @@ using Token = std::variant<
 
 inline auto op_str(const OpType &type) -> std::string {
     switch (type) {
-        case OpType::Not:
+        using enum OpType;
+        case Not:
             return "not";
-        case OpType::Plus:
+        case Plus:
             return "+";
-        case OpType::Minus:
+        case Minus:
             return "-";
-        case OpType::Mult:
+        case Mult:
             return "*";
-        case OpType::Div:
+        case Div:
             return "/";
-        case OpType::Assign:
+        case Assign:
             return "=";
-        case OpType::PlusEq:
+        case PlusEq:
             return "+=";
-        case OpType::MinusEq:
+        case MinusEq:
             return "-=";
-        case OpType::MultEq:
+        case MultEq:
             return "*=";
-        case OpType::DivEq:
+        case DivEq:
             return "/=";
-        case OpType::Eq:
+        case Eq:
             return "==";
-        case OpType::NotEq:
+        case NotEq:
             return "!=";
-        case OpType::Less:
+        case Less:
             return "<";
-        case OpType::LessEq:
+        case LessEq:
             return "<=";
-        case OpType::Greater:
+        case Greater:
             return ">";
-        case OpType::GreaterEq:
+        case GreaterEq:
             return ">=";
-        case OpType::In:
+        case In:
             return "in";
-        case OpType::And:
+        case And:
             return "and";
-        case OpType::Or:
+        case Or:
             return "or";
-        case OpType::Neg:
+        case Neg:
             return "-";
-        case OpType::Comma:
+        case Comma:
             return ",";
-        case OpType::LParen:
+        case LParen:
             return "(";
-        case OpType::RParen:
+        case RParen:
             return ")";
         default:
             std::println(std::cerr, "Invalid operator in token");
