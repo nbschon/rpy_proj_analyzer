@@ -106,7 +106,7 @@ auto Layout::make_label(const std::vector<std::unique_ptr<Node>>& nodes,
     return std::make_unique<LayoutGroup>(label_idx, GroupType::Label, std::move(column));
 }
 
-void Layout::layout_node(LayoutBase& disp, const int left_x, const unsigned row) {
+void Layout::layout_node(LayoutBase& disp, const float left_x, const float row) {
     if (auto* group = dynamic_cast<LayoutGroup*>(&disp)) {
         layout_group(*group, left_x, row);
     } else {
@@ -114,27 +114,32 @@ void Layout::layout_node(LayoutBase& disp, const int left_x, const unsigned row)
     }
 }
 
-void Layout::layout_column(const LayoutColumn& col, const int left_x, const unsigned row) {
-    unsigned curr_row = row;
+void Layout::layout_column(const LayoutColumn& col, const float left_x, const float row) {
+    float curr_row = row;
     for (const auto& display : col.displays) {
-        const int parent_center = left_x + static_cast<int>(col.center_offset);
+        const float parent_center = left_x + col.center_offset;
 
         if (const auto* g = dynamic_cast<LayoutGroup*>(display.get())) {
-            const int child_left = parent_center - g->anchor_x();
+            const float child_left = parent_center - g->anchor_x();
             layout_node(*display, child_left, curr_row);
         } else {
-            const int item_left = parent_center - static_cast<int>(display->width) / 2;
-            display->layout = {item_left, curr_row, display->width, display->height};
+            const float item_left = parent_center - (display->width / 2);
+            display->layout = {
+                .left_x=item_left,
+                .top_y=curr_row,
+                .w_units=display->width,
+                .h_units=display->height,
+            };
         }
 
         curr_row += display->height;
     }
 }
 
-void Layout::layout_group(LayoutGroup& group, const int left_x, const unsigned row) {
+void Layout::layout_group(LayoutGroup& group, const float left_x, const float row) {
     group.layout = {.left_x=left_x, .top_y=row, .w_units=group.width, .h_units=group.height};
 
-    int x_pos = left_x;
+    float x_pos = left_x;
 
     for (auto& col : group.columns) {
         layout_column(col, x_pos, row);
@@ -149,12 +154,12 @@ auto LayoutBase::has_children() -> bool {
     return false;
 }
 
-auto LayoutBase::update_width() -> unsigned {
-    return 1;
+auto LayoutBase::update_width() -> float {
+    return 1.0f;
 }
 
-auto LayoutBase::update_height() -> unsigned {
-    return 1;
+auto LayoutBase::update_height() -> float {
+    return 1.0f;
 }
 
 auto LayoutBase::update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int {
@@ -241,36 +246,36 @@ auto LayoutColumn::has_children() -> bool {
     return true;
 }
 
-auto LayoutColumn::update_width() -> unsigned {
-    unsigned left_extent  = 0;
-    unsigned right_extent = 0;
+auto LayoutColumn::update_width() -> float {
+    float left_extent  = 0;
+    float right_extent = 0;
 
     for (const auto& node : displays) {
-        const unsigned w = node->update_width();
+        const float w = node->update_width();
 
         if (auto* g = dynamic_cast<LayoutGroup*>(node.get())) {
-            const unsigned ax = static_cast<unsigned>(std::max(0, g->anchor_x()));
+            const float ax = std::max(0.0f, g->anchor_x());
             left_extent  = std::max(left_extent, ax);
             right_extent = std::max(right_extent, w - std::min(ax, w));
         } else {
-            const unsigned half = w / 2;
+            const float half = w / 2;
             left_extent  = std::max(left_extent, half);
             right_extent = std::max(right_extent, w - half); // handles odd widths
         }
     }
 
     center_offset = left_extent;
-    this->width = std::max(1u, left_extent + right_extent);
+    this->width = std::max(1.0f, left_extent + right_extent);
     return this->width;
 }
 
 
-auto LayoutColumn::update_height() -> unsigned {
-    unsigned acc_height = 0;
+auto LayoutColumn::update_height() -> float {
+    float acc_height = 0;
     for (const auto& node : displays) {
         acc_height += node->update_height();
     }
-    this->height = std::max(1u, acc_height);
+    this->height = std::max(1.0f, acc_height);
     return this->height;
 }
 
@@ -317,29 +322,28 @@ auto LayoutGroup::has_children() -> bool {
     return true;
 }
 
-auto LayoutGroup::update_width() -> unsigned {
-    unsigned acc_width = 0;
+auto LayoutGroup::update_width() -> float {
+    float acc_width = 0;
     anchor_offset = 0;
 
     for (auto& col : columns) {
         acc_width += col.update_width();
     }
 
-    const unsigned n = columns.size();
-    const unsigned mid = n / 2;
+    const float mid = static_cast<float>(columns.size()) / 2;
 
     for (unsigned i = 0; i < columns.size(); ++i) {
-        if (i < mid) {
+        if (static_cast<float>(i) < mid) {
             anchor_offset += columns.at(i).width;
         }
     }
 
-    width = std::max(1u, acc_width);
+    width = std::max(1.0f, acc_width);
     return width;
 }
 
-auto LayoutGroup::update_height() -> unsigned {
-    unsigned max_col = 0;
+auto LayoutGroup::update_height() -> float {
+    float max_col = 0;
     for (auto& col : columns) {
         max_col = std::max(max_col, col.update_height());
     }
@@ -384,21 +388,21 @@ void LayoutGroup::collect_edges(std::unordered_map<Node*, Node*>& edges) {
     }
 }
 
-auto LayoutGroup::anchor_x() const -> int {
+auto LayoutGroup::anchor_x() const -> float {
     if (columns.empty()) {
         return 1;
     }
 
     const unsigned left_mid = (columns.size() - 1) / 2;
-    unsigned left_sum = 0;
+    float left_sum = 0;
     for (unsigned i = 0; i < left_mid; ++i) {
         left_sum += columns.at(i).width;
     }
 
     if (columns.size() % 2 == 0) {
-        return static_cast<int>(left_sum + columns.at(left_mid).width);
+        return left_sum + static_cast<float>(columns.at(left_mid).width);
     }
-    return static_cast<int>(left_sum + columns.at(left_mid).width / 2);
+    return left_sum + (columns.at(left_mid).width / 2);
 }
 
 void GraphLayout::assign_dimensions() const {
@@ -409,7 +413,7 @@ void GraphLayout::assign_dimensions() const {
 }
 
 void GraphLayout::assign_layouts() {
-    unsigned y_pos = 0;
+    float y_pos = 0;
     for (const auto& group : top_levels) {
         Layout::layout_node(*group, 0, y_pos);
         if (dynamic_cast<LayoutGroup*>(group.get()) != nullptr) {
@@ -471,7 +475,7 @@ auto GraphLayout::get_groups() -> std::vector<std::unique_ptr<LayoutBase>>& {
     return top_levels;
 }
 
-auto GraphLayout::get_max_width() -> unsigned {
+auto GraphLayout::get_max_width() -> float {
     return std::ranges::max(
         top_levels | std::views::transform(&LayoutGroup::width)
     );

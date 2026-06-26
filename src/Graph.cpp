@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <format>
-#include <functional>
 #include <unordered_map>
 
 #include "Typing.hpp"
@@ -702,8 +701,7 @@ auto Graph::find_highest_wc_path() const -> int {
         return {};
     };
 
-    std::function<int(unsigned)> best_from;
-    best_from = [&](unsigned i) -> int {
+    auto best_from = [&](this auto self, unsigned i) -> int {
         auto &m = memos.at(i);
 
         if (m.computed) {
@@ -719,7 +717,7 @@ auto Graph::find_highest_wc_path() const -> int {
         std::optional<unsigned> best_next;
 
         for (const auto &s : successors(i)) {
-            if (const auto candidate = best_from(s); candidate > best_tail) {
+            if (const auto candidate = self(s); candidate > best_tail) {
                 best_tail = candidate;
                 best_next = s;
             }

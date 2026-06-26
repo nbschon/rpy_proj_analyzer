@@ -68,7 +68,7 @@ void FileTreePanel::update(const raylib::Window &win) {
 void FileTreePanel::draw(const raylib::Window &win) {
     rect.Draw(raylib::Color::White());
 
-    const std::function<void(const DirTree&, int)> rec_draw = [&](const DirTree &t, const int lvl) -> void {
+    const auto rec_draw = [&](this auto self, const DirTree &t, const int lvl) -> void {
         for (const auto & [rect, node, d, o] : files) {
             if (node->is_dir) {
                 rect.DrawLines(raylib::Color::Black());

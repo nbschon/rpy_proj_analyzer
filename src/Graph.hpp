@@ -12,7 +12,6 @@
 #include <concepts>
 #include <expected>
 #include <filesystem>
-#include <functional>
 #include <iostream>
 #include <print>
 
@@ -75,8 +74,7 @@ class Graph {
     void dfs(F&& fn) {
         visited = std::vector<bool>(nodes.size());
 
-        std::function<void(unsigned node)> dfs_traverse;
-        dfs_traverse = [&](const unsigned node_idx) -> void {
+        auto dfs_traverse = [&](this auto self, const unsigned node_idx) -> void {
             if (node_idx >= nodes.size()) {
                 return;
             }
@@ -96,11 +94,11 @@ class Graph {
 
             if (node.has_children()) {
                 if (const auto *parent = dynamic_cast<const NodeParent*>(&node); parent->first_child) {
-                    dfs_traverse(*parent->first_child);
+                    self(*parent->first_child);
                 }
             }
             if (node.next) {
-                dfs_traverse(*node.next);
+                self(*node.next);
             }
 
             if constexpr (T == TrvOrd::Post) {
@@ -113,7 +111,7 @@ class Graph {
         }
     }
 
-    int find_highest_wc_path() const;
+    auto find_highest_wc_path() const -> int;
 
 public:
     explicit Graph(const std::filesystem::path &path);

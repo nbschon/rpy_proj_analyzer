@@ -17,10 +17,10 @@
 #include "raylib-cpp.hpp"
 
 struct LayoutDims {
-    int left_x{};
-    unsigned top_y{};
-    unsigned w_units = 1;
-    unsigned h_units = 1;
+    float left_x{};
+    float top_y{};
+    float w_units = 1;
+    float h_units = 1;
 };
 
 enum class GroupType : std::uint8_t {
@@ -34,16 +34,16 @@ protected:
     unsigned idx;
 
 public:
-    unsigned width = 1;
-    unsigned height = 1;
+    float width = 1;
+    float height = 1;
     LayoutDims layout{};
     explicit LayoutBase(unsigned idx);
     virtual ~LayoutBase() = default;
 
     virtual auto to_string() -> std::string = 0;
     virtual auto has_children() -> bool;
-    virtual auto update_width() -> unsigned;
-    virtual auto update_height() -> unsigned;
+    virtual auto update_width() -> float;
+    virtual auto update_height() -> float;
     virtual auto update_highest_wc(const std::vector<std::unique_ptr<Node>> &nodes) -> int;
     virtual void mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes);
     virtual void flatten(std::vector<LayoutBase*>& flat_disps);
@@ -63,14 +63,14 @@ public:
 class LayoutColumn : public LayoutBase {
 
 public:
-    unsigned center_offset = 0;
+    float center_offset = 0;
     std::vector<std::unique_ptr<LayoutBase>> displays;
 
     LayoutColumn(const std::vector<std::unique_ptr<Node>>& nodes, unsigned parent_idx, unsigned first_node, const NodeParent* parent_ptr);
     auto to_string() -> std::string override;
     auto has_children() -> bool override;
-    auto update_width() -> unsigned override;
-    auto update_height() -> unsigned override;
+    auto update_width() -> float override;
+    auto update_height() -> float override;
     auto update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int override;
     void mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) override;
     void flatten(std::vector<LayoutBase*>& flat_disps) override;
@@ -79,7 +79,7 @@ public:
 
 class LayoutGroup : public LayoutBase {
     GroupType type{};
-    unsigned anchor_offset = 0;
+    float anchor_offset = 0;
 
 public:
     std::vector<LayoutColumn> columns;
@@ -89,13 +89,13 @@ public:
     LayoutGroup(unsigned idx, GroupType type, std::vector<LayoutColumn> columns);
     auto to_string() -> std::string override;
     auto has_children() -> bool override;
-    auto update_width() -> unsigned override;
-    auto update_height() -> unsigned override;
+    auto update_width() -> float override;
+    auto update_height() -> float override;
     auto update_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) -> int override;
     void mark_highest_wc(const std::vector<std::unique_ptr<Node>>& nodes) override;
     void flatten(std::vector<LayoutBase*>& flat_disps) override;
     void collect_edges(std::unordered_map<Node*, Node*>& edges) override;
-    [[nodiscard]] auto anchor_x() const -> int;
+    [[nodiscard]] auto anchor_x() const -> float;
 };
 
 constexpr int N_POINTS = 5;
@@ -118,7 +118,7 @@ class GraphLayout {
 public:
     explicit GraphLayout(Graph &graph);
     auto get_groups() -> std::vector<std::unique_ptr<LayoutBase>>&;
-    auto get_max_width() -> unsigned;
+    auto get_max_width() -> float;
     auto make_displayables(Graph &graph) -> LayoutData;
 };
 
@@ -127,9 +127,9 @@ namespace Layout {
     auto make_menu(const std::vector<std::unique_ptr<Node>>& nodes, unsigned parent_idx, unsigned idx) -> std::unique_ptr<LayoutGroup>;
     auto make_label(const std::vector<std::unique_ptr<Node>>& nodes, unsigned header_idx, unsigned idx) -> std::unique_ptr<LayoutGroup>;
 
-    void layout_node(LayoutBase &disp, int left_x, unsigned row);
-    void layout_column(const LayoutColumn &col, int left_x, unsigned row);
-    void layout_group(LayoutGroup &group, int left_x, unsigned row);
+    void layout_node(LayoutBase &disp, float left_x, float row);
+    void layout_column(const LayoutColumn &col, float left_x, float row);
+    void layout_group(LayoutGroup &group, float left_x, float row);
 }
 
 #endif //RPY_PROJ_ANALYZER_GRAPHLAYOUT_HPP

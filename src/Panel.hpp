@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <filesystem>
 #include <format>
-#include <functional>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -52,12 +51,12 @@ struct DirTree {
 inline auto flat_files(const DirTree &tree) -> std::vector<std::string>  {
     std::vector<std::string> files;
 
-    std::function<void(const DirTree&, int)> rec_add = [&](const DirTree &t, const int lvl) -> void {
+     auto rec_add = [&](this auto self, const DirTree &t, const int lvl) -> void {
         for (const auto &child : t.children) {
             std::string spaces(lvl, '\t');
             files.push_back(std::format("{}{}", spaces, child.name));
             if (child.is_dir) {
-                rec_add(child, lvl + 1);
+                self(child, lvl + 1);
             }
         }
     };

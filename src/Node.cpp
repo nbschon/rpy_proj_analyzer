@@ -348,6 +348,10 @@ auto NodeExpr::make_display_node(raylib::Rectangle rect) const -> DisplayNode {
     return {this, rect, title, fields};
 }
 
+auto NodeExpr::get_expr() const -> const std::unique_ptr<Expr>& {
+    return expr;
+}
+
 NodePlay::NodePlay(const Tok& token, const AudioChannel channel, std::string path)
     : Node(token), channel(channel), path(std::move(path)) {
 }

@@ -211,6 +211,8 @@ public:
     [[nodiscard]] auto to_string() const -> std::string override;
 
     [[nodiscard]] auto make_display_node(raylib::Rectangle rect) const -> DisplayNode override;
+
+    auto get_expr() const -> const std::unique_ptr<Expr>&;
 };
 
 class NodePlay final : public Node {
